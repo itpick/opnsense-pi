@@ -48,7 +48,12 @@ mount "$ufs" "$root"
 kernel=$(strings "$root/boot/kernel/kernel" | grep -m1 '^@(#)FreeBSD' | sed 's/^@(#)//')
 version=$(chroot "$root" /usr/local/sbin/opnsense-version)
 echo ">> $board image: $version, kernel $kernel"
-strings "$root/boot/kernel/kernel" | grep -q -E '/SMP$' || { echo "kernel was not built from the SMP config the modules are built for" >&2; exit 1; }
+# e.g. "FreeBSD 15.1-RELEASE-p1 stable/26.7-n283674-12334a596709 SMP": the
+# kernel config's ident is last, the source commit before it.
+case "$kernel" in *" SMP") ;; *) echo "kernel was not built from the SMP config the modules are built for" >&2; exit 1 ;; esac
+KERNEL_SRC_COMMIT=$(echo "$kernel" | sed -nE 's/.*-n[0-9]+-([0-9a-f]+) .*/\1/p')
+[ -n "$KERNEL_SRC_COMMIT" ] || { echo "cannot find the source commit in the kernel version" >&2; exit 1; }
+export KERNEL_SRC_COMMIT
 grep -q 'rc.syshook import' "$root/etc/rc" || { echo "/etc/rc has no import syshook; the boot hook would never run" >&2; exit 1; }
 
 # Plugins, with the image's own pkg (a newer host pkg could upgrade its database).

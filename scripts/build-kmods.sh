@@ -31,6 +31,15 @@ if [ "$(cat $src/.opnsense-pi 2>/dev/null)" != "$OPNSENSE_SRC_REF" ]; then
 	git -C $src sparse-checkout set sys
 	echo "$OPNSENSE_SRC_REF" > $src/.opnsense-pi
 fi
+# The image's kernel names its source commit (customize.sh passes it on); the
+# checkout must be that commit, or OPNSENSE_SRC_REF needs bumping.
+head=$(git -C $src rev-parse HEAD)
+if [ -n "${KERNEL_SRC_COMMIT:-}" ]; then
+	case "$head" in
+	"$KERNEL_SRC_COMMIT"*) echo ">> sources at $head match the image kernel" ;;
+	*) echo "$OPNSENSE_SRC_REF is $head, but the image kernel was built from $KERNEL_SRC_COMMIT" >&2; exit 1 ;;
+	esac
+fi
 
 # 2. Kernel option headers for the image's kernel config. SMP-ARM lives in
 #    opnsense/tools; %%DEBUG%% is filled from kernel.default as the build does.
