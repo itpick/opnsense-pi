@@ -1,0 +1,79 @@
+#!/bin/sh
+# opnsense-pi boot hook. Runs from /etc/rc in the "import" stage: / is writable,
+# nothing is configured yet, and the configuration importer (20-importer) and
+# the interface setup come after it.
+#
+# Everything is driven by files in opnsense-pi/ on the FAT EFI partition, so it
+# can be set up from any computer after flashing (or by a netboot installer):
+#
+#   config.xml            installed as /conf/config.xml once, then renamed to
+#                         config.xml.applied (the old config is kept in
+#                         /conf/backup/)
+#   drivers               "auto" (default), "force" or "off": whether to load
+#                         this board's extra kernel modules (see below)
+#   reboot-after-minutes  a number: reboot that many minutes after every boot.
+#                         A safety net for remote installs; delete it to stop.
+#
+# Extra kernel modules (e.g. Pi 5 RP1 Ethernet) are listed in
+# /usr/local/etc/opnsense-pi/board.conf. They poke the board's hardware
+# directly when loaded, so "auto" only loads them when SMBIOS names the board.
+
+LOG=/var/log/opnsense-pi.log
+log() {
+	echo "opnsense-pi: $*"
+	mkdir -p /var/log && echo "$(date '+%Y-%m-%dT%H:%M:%S') $*" >> ${LOG}
+}
+
+BOARD='' BOARD_MATCH='' KMODS_LOAD=''
+[ -f /usr/local/etc/opnsense-pi/board.conf ] && . /usr/local/etc/opnsense-pi/board.conf
+
+esp=$(gpart show -p 2>/dev/null | awk '$4 == "efi" { print "/dev/" $3; exit }')
+mnt=/tmp/.opnsense-pi-esp
+drivers=auto
+if [ -n "${esp}" ] && mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} 2>/dev/null; then
+	dir=${mnt}/opnsense-pi
+	if [ -f ${dir}/config.xml ]; then
+		mkdir -p /conf/backup
+		[ -f /conf/config.xml ] && cp /conf/config.xml "/conf/backup/config-opnsense-pi-$(date +%s).xml"
+		if cp ${dir}/config.xml /conf/config.xml.new && mv /conf/config.xml.new /conf/config.xml; then
+			mv ${dir}/config.xml ${dir}/config.xml.applied
+			log "installed config.xml from ${esp}"
+		else
+			log "could not install config.xml from ${esp}"
+		fi
+	fi
+	[ -f ${dir}/drivers ] && drivers=$(tr -cd 'a-z' < ${dir}/drivers)
+	if [ -f ${dir}/reboot-after-minutes ]; then
+		mins=$(tr -cd '0-9' < ${dir}/reboot-after-minutes)
+		if [ -n "${mins}" ] && [ "${mins}" -gt 0 ]; then
+			log "reboot-after-minutes: rebooting in ${mins} minutes"
+			daemon -f sh -c "sleep $((mins * 60)); echo \"\$(date '+%Y-%m-%dT%H:%M:%S') reboot-after-minutes: rebooting\" >> ${LOG}; /sbin/shutdown -r now"
+		fi
+	fi
+	umount ${mnt}
+fi
+
+if [ -n "${KMODS_LOAD}" ]; then
+	product=$(kenv -q smbios.system.product)
+	case "${drivers}" in
+	off)
+		load='' why="disabled by opnsense-pi/drivers" ;;
+	force)
+		load=1 why="forced by opnsense-pi/drivers" ;;
+	*)
+		case "${product}" in
+		*"${BOARD_MATCH}"*) load=1 why="SMBIOS product '${product}'" ;;
+		*) load='' why="SMBIOS product is '${product:-unknown}', not '${BOARD_MATCH}'" ;;
+		esac ;;
+	esac
+	if [ -n "${load}" ]; then
+		log "loading ${KMODS_LOAD} (${why})"
+		for k in ${KMODS_LOAD}; do
+			kldstat -qm ${k} || kldload ${k} || log "kldload ${k} failed"
+		done
+	else
+		log "not loading ${BOARD} modules ${KMODS_LOAD}: ${why}"
+	fi
+fi
+
+exit 0

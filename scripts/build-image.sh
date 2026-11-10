@@ -8,8 +8,10 @@
 # the Pi's EEPROM bootloader reads (config.txt -> armstub=RPI_EFI.fd). UEFI then
 # boots FreeBSD's loader from the same partition. One image, one disk.
 #
-# Output: out/opnsense-<board>.img.xz and out/opnsense-<board>.img.xz.sha256
-# Needs: curl, sha256sum, bunzip2, qemu-img, sfdisk, unzip, mtools, xz
+# Output: out/opnsense-<board>.img (raw). Then, for a release image:
+#   scripts/customize.sh  (FreeBSD) adds the bundled drivers and boot hook
+#   scripts/compress.sh   writes out/opnsense-<board>.img.xz and its .sha256
+# Needs: curl, sha256sum, bunzip2, qemu-img, sfdisk, unzip, mtools
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # shellcheck source=versions.env
@@ -22,7 +24,7 @@ case "$board" in
   *) echo "usage: $0 pi4|pi5" >&2; exit 2 ;;
 esac
 
-for tool in curl sha256sum bunzip2 qemu-img sfdisk unzip mcopy xz; do
+for tool in curl sha256sum bunzip2 qemu-img sfdisk unzip mcopy; do
   command -v "$tool" >/dev/null || { echo "missing tool: $tool" >&2; exit 1; }
 done
 
@@ -72,7 +74,5 @@ export MTOOLS_SKIP_CHECK=1
 mcopy -s -o -i "$esp" "$work/fw"/* ::/
 mdir -/ -b -i "$esp" :: | sed 's/^/   /'
 
-echo ">> compressing"
-xz -T0 -6 -c "$img" >"out/opnsense-$board.img.xz"
-(cd out && sha256sum "opnsense-$board.img.xz" >"opnsense-$board.img.xz.sha256")
-echo ">> out/opnsense-$board.img.xz ($(du -h "out/opnsense-$board.img.xz" | cut -f1))"
+mv "$img" "out/opnsense-$board.img"
+echo ">> out/opnsense-$board.img"

@@ -3,10 +3,16 @@ name: release
 # Push a tag like 26.7-2 to build both images and publish them as a release.
 # The Pages download buttons point at releases/latest, so they follow along.
 # A tag whose release already exists (e.g. one made locally with `make release`)
-# is left alone.
+# is left alone. Pull requests and manual runs build the same images and keep
+# them as a workflow artifact instead.
+#
+# Linux builds the raw images (firmware into the ESP); a FreeBSD 15.1 aarch64
+# VM adds the bundled drivers (scripts/customize.sh needs to write UFS and run
+# the image's own pkg); Linux compresses them.
 on:
   push:
     tags: ["*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +21,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 240
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -31,18 +37,44 @@ jobs:
       - name: Install tools
         if: steps.existing.outputs.skip != 'true'
         run: sudo apt-get update && sudo apt-get install -y qemu-utils mtools xz-utils unzip fdisk
-      - name: Build images
+      - name: Build raw images
         if: steps.existing.outputs.skip != 'true'
-        run: make images
+        run: |
+          scripts/build-image.sh pi5
+          scripts/build-image.sh pi4
+          rm -rf .work/cache
+      - name: Add bundled drivers (FreeBSD 15.1 aarch64)
+        if: steps.existing.outputs.skip != 'true'
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.1"
+          arch: aarch64
+          usesh: true
+          sync: nfs
+          mem: 8192
+          prepare: pkg install -y git
+          run: |
+            sh scripts/customize.sh pi5 out/opnsense-pi5.img
+            sh scripts/customize.sh pi4 out/opnsense-pi4.img
+      - name: Compress
+        if: steps.existing.outputs.skip != 'true'
+        run: |
+          scripts/compress.sh pi5
+          scripts/compress.sh pi4
+          cat out/*.manifest.txt
       - name: Publish release
         if: steps.existing.outputs.skip != 'true' && startsWith(github.ref, 'refs/tags/')
         run: |
-          gh release create "$GITHUB_REF_NAME" out/*.img.xz out/*.sha256 \
+          gh release create "$GITHUB_REF_NAME" out/*.img.xz out/*.sha256 out/*.manifest.txt out/*.config.xml \
             --title "OPNsense Pi $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
-      - name: Keep images (manual runs)
+      - name: Keep images (pull requests, manual runs)
         if: steps.existing.outputs.skip != 'true' && !startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: images
-          path: out/
+          path: |
+            out/*.img.xz
+            out/*.sha256
+            out/*.manifest.txt
+            out/*.config.xml
           retention-days: 7
