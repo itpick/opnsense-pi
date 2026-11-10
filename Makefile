@@ -52,4 +52,4 @@ release:
 	gh release create "$(TAG)" out/*.img.xz out/*.sha256 $(wildcard out/*.manifest.txt out/*.config.xml) --title "OPNsense Pi $(TAG)" --notes-file RELEASE_NOTES.md
 
 clean:
-	rm -rf out .work/vm .work/build-* .work/kmods
+	rm -rf out .work/vm .work/build-*

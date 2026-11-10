@@ -15,7 +15,9 @@ set -eu
 cd "$(dirname "$0")/.."
 . ./versions.env
 root=$1
-work=$(pwd)/.work/kmods
+# Local scratch, not the checkout: in CI the checkout is an NFS share from the
+# host (owned by another uid, which git refuses, and slow to compile on).
+work=/var/tmp/opnsense-pi-kmods
 src=/usr/src
 mkdir -p "$work"
 
