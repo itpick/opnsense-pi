@@ -150,6 +150,8 @@ drivers               "auto" (default): load this board's extra drivers only on
                       the board. "force" or "off" to override.
 reboot-after-minutes  A number of minutes: reboot that long after every boot.
                       A safety net for remote installs. Delete it to stop.
+                      These boots save diagnostics here as diag-boot.txt,
+                      diag-running.txt (3 minutes in) and diag-reboot.txt.
 
 The boot hook logs to /var/log/opnsense-pi.log.
 EOF

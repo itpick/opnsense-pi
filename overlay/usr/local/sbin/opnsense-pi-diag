@@ -1,0 +1,46 @@
+#!/bin/sh
+# opnsense-pi-diag STAGE: save a diagnostics snapshot (kernel messages, modules,
+# interfaces, the boot hook's log) to the EFI partition as
+# opnsense-pi/diag-STAGE.txt.
+#
+# The boot hook runs it on trial boots (reboot-after-minutes): at boot, a few
+# minutes in, and just before the reboot. The FAT partition survives a
+# reinstall long enough for the pxe installer to read it, so a remote install
+# that never reaches the network still says why.
+stage=$(echo "${1:-manual}" | tr -cd 'a-z0-9-')
+
+mnt=$(mount -p 2>/dev/null | awk '$2 == "/boot/efi" && $3 == "msdosfs" { print $2; exit }')
+own_mnt=
+if [ -z "${mnt}" ]; then
+	esp=$(gpart show -p 2>/dev/null | awk '$4 == "efi" { print "/dev/" $3; exit }')
+	[ -n "${esp}" ] || { echo "opnsense-pi-diag: no EFI partition" >&2; exit 1; }
+	mnt=/tmp/.opnsense-pi-diag
+	mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} || exit 1
+	own_mnt=1
+fi
+
+run() { echo "### $1"; sh -c "$1" 2>&1; echo; }
+tmp=$(mktemp /tmp/opnsense-pi-diag.XXXXXX)
+{
+	echo "opnsense-pi diagnostics, stage ${stage}: $(date '+%Y-%m-%dT%H:%M:%S%z')"
+	run 'uptime; uname -a'
+	run 'cat /usr/local/etc/opnsense-pi/manifest.txt | head -12'
+	run 'cat /var/log/opnsense-pi.log'
+	run 'kenv | grep -E "^smbios\.(system|bios)|^acpi|^hw\.fdt|^kern\.(vty|console)"'
+	run 'kldstat'
+	run 'ofwdump -a 2>&1 | head -60'
+	run 'ifconfig -a'
+	run 'netstat -rn -f inet'
+	run 'sockstat -4l'
+	run 'sysctl hw.rp1_eth 2>/dev/null'
+	run 'devinfo -v 2>/dev/null | grep -iE "rp1|bcm2712|pcib|gem|eth|xhci|sdhci"'
+	run 'pciconf -l 2>/dev/null'
+	run 'tail -n 60 /var/log/system/latest.log 2>/dev/null'
+	run 'dmesg -a'
+} > "${tmp}"
+mkdir -p "${mnt}/opnsense-pi"
+cp "${tmp}" "${mnt}/opnsense-pi/diag-${stage}.txt"
+rm -f "${tmp}"
+sync
+[ -n "${own_mnt}" ] && umount ${mnt}
+exit 0

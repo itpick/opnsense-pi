@@ -141,6 +141,9 @@ case "$test" in
     done
     [[ "$(vssh 'grep -c "rebooting in 3 minutes" /var/log/opnsense-pi.log')" -ge 2 ]] || fail "it never rebooted by itself"
     ok "rebooted by itself and scheduled the next one"
+    vssh 'grep -q "stage boot" /boot/efi/opnsense-pi/diag-boot.txt && grep -q "stage reboot" /boot/efi/opnsense-pi/diag-reboot.txt && grep -q "^### ifconfig -a" /boot/efi/opnsense-pi/diag-reboot.txt' \
+      || fail "diagnostics snapshots missing from the ESP"
+    ok "diagnostics saved to the ESP (diag-boot.txt, diag-reboot.txt)"
     ;;
   *) echo "usage: $0 plugin|image|trial [pi5|pi4]" >&2; exit 2 ;;
 esac
