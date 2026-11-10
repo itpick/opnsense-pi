@@ -121,6 +121,7 @@ manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 	if [ "$board" = pi5 ]; then
 		echo "rpi5 modules: $RPI5_KMODS_REPO @ $RPI5_KMODS_REV"
 		echo "  built against $OPNSENSE_SRC_REPO $OPNSENSE_SRC_REF, $OPNSENSE_KERNCONF"
+		for p in patches/rpi5-kmods/*.patch; do [ -f "$p" ] && echo "  patched: $p"; done
 		for k in $RPI5_KMODS_BUILD; do echo "  /boot/modules/$k.ko"; done
 		echo "  loaded at boot on a Pi 5: $RPI5_KMODS_LOAD"
 	fi

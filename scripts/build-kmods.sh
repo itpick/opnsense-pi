@@ -64,6 +64,13 @@ rm -rf "$m"
 git clone -q "$RPI5_KMODS_REPO" "$m"
 git -C "$m" checkout -q "$RPI5_KMODS_REV"
 rm -f "$m"/opt_*.h
+# Our fixes on top of the pinned commit (patches/rpi5-kmods/, -p1 from the
+# module repo's root). Each should go upstream; drop it once the pin has it.
+for p in patches/rpi5-kmods/*.patch; do
+	[ -f "$p" ] || continue
+	echo ">> applying $p"
+	patch -s -t -N -p1 -d "$m" < "$p"
+done
 for k in $RPI5_KMODS_BUILD; do
 	echo ">> building $k"
 	make -s -C "$m" MODULE="$k" SYSDIR=$src/sys KERNBUILDDIR="$kb" DEBUG_FLAGS= WITHOUT_DEBUG_FILES=yes
