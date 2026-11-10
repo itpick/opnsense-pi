@@ -75,6 +75,7 @@ for p in $PLUGINS; do
 	chroot "$root" env ASSUME_ALWAYS_YES=yes pkg install -y "$p"
 done
 chroot "$root" pkg clean -ay -q
+plugin_versions=$(chroot "$root" pkg query '  %n %v' | grep -E "$(echo "$PLUGINS" | tr ' ' '|')|realtek" || true)
 rm -f "$root/etc/resolv.conf"
 [ -n "$had_resolv" ] && mv "$root/etc/resolv.conf.opnsense-pi" "$root/etc/resolv.conf"
 umount "$root/dev"
@@ -116,7 +117,7 @@ manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 	echo "opnsense: $version"
 	echo "kernel: $kernel"
 	echo "plugins:"
-	chroot "$root" pkg query '  %n %v' | grep -E "$(echo "$PLUGINS" | tr ' ' '|')|realtek" || true
+	echo "$plugin_versions"
 	if [ "$board" = pi5 ]; then
 		echo "rpi5 modules: $RPI5_KMODS_REPO @ $RPI5_KMODS_REV"
 		echo "  built against $OPNSENSE_SRC_REPO $OPNSENSE_SRC_REF, $OPNSENSE_KERNCONF"
@@ -127,13 +128,17 @@ manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 	sed 's/^/  /' "$root/boot/loader.conf"
 } > "$manifest"
 cp "$manifest" "out/opnsense-$board.manifest.txt"
-cp "$root/conf/config.xml" "out/opnsense-$board.config.xml"
+# No /conf/config.xml until first boot, which copies this default (the one the
+# image build set the console in).
+default_config=$root/usr/local/etc/config.xml
+[ -f "$root/conf/config.xml" ] && default_config=$root/conf/config.xml
+cp "$default_config" "out/opnsense-$board.config.xml"
 
 # ESP: a README and the default config next to where a seed goes.
 esp_mnt=$(mktemp -d /tmp/opnsense-pi-esp.XXXXXX)
 mount_msdosfs "$esp" "$esp_mnt"
 mkdir -p "$esp_mnt/opnsense-pi"
-cp "$root/conf/config.xml" "$esp_mnt/opnsense-pi/config.xml.default"
+cp "$default_config" "$esp_mnt/opnsense-pi/config.xml.default"
 cat > "$esp_mnt/opnsense-pi/README.txt" <<'EOF'
 opnsense-pi first-boot settings (read at every boot, before anything starts)
 
