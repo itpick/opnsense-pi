@@ -3,7 +3,7 @@ OPNsense 26.7 (FreeBSD 15.1) for Raspberry Pi. Unofficial; not supported by Deci
 | Asset | Board | Status |
 |---|---|---|
 | `opnsense-pi4.img.xz` | Raspberry Pi 4 (pftf/RPi4 UEFI v1.53) | Works: LAN `genet0`, WAN USB NIC (`ue0`); `os-realtek-re` preinstalled |
-| `opnsense-pi5.img.xz` | Raspberry Pi 5, D0 boards (rpi5-uefi v0.1, SD boot) | Experimental: RP1 Ethernet driver (`rp1eth0`) bundled but not yet proven on a board; `os-realtek-re` preinstalled |
+| `opnsense-pi5.img.xz` | Raspberry Pi 5, D0 boards (rpi5-uefi v0.1, SD boot) | Experimental: onboard Ethernet `rp1eth0` works (tested on one 16 GB board: DHCP, SSH, GUI, API, reboot); USB NIC `ue0` attaches; `os-realtek-re` preinstalled |
 
 Flash (erases the target):
 

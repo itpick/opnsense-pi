@@ -71,8 +71,8 @@
       <span class="tag exp">Experimental</span>
       <h2>Raspberry Pi 5</h2>
       <ul>
-        <li>Boots, but the onboard Ethernet is <strong>not</strong> supported yet (RP1)</li>
-        <li>USB NIC as WAN/LAN: unverified</li>
+        <li>Onboard Ethernet <code>rp1eth0</code> works (1 Gb/s; tested on a 16&nbsp;GB board)</li>
+        <li>USB 3 NIC (RTL8156) attaches as <code>ue0</code>; traffic not yet tested</li>
         <li>UEFI: rpi5-uefi v0.1, D0 boards (all 16&nbsp;GB), SD boot</li>
         <li>AES hardware on Cortex-A76</li>
       </ul>
@@ -93,7 +93,7 @@
   <ol>
     <li>Update the EEPROM bootloader first (Raspberry Pi OS: <code>sudo rpi-eeprom-update -a</code>).</li>
     <li>Pi 4: press <kbd>Esc</kbd> at the UEFI splash, go to <em>Device Manager → Raspberry Pi Configuration → Advanced Configuration</em>, and disable <em>Limit RAM to 3 GB</em>.</li>
-    <li>On the HDMI console, assign interfaces: LAN <code>genet0</code>, WAN <code>ue0</code>.</li>
+    <li>On the HDMI console, assign interfaces: LAN <code>genet0</code> (Pi 4) or <code>rp1eth0</code> (Pi 5), WAN <code>ue0</code>.</li>
     <li>Open <code>https://192.168.1.1</code> and log in as <code>root</code> / <code>opnsense</code>. Change the password.</li>
   </ol>
 

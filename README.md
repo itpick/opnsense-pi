@@ -14,11 +14,11 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | | Raspberry Pi 4 | Raspberry Pi 5 |
 |---|---|---|
 | UEFI firmware | [pftf/RPi4](https://github.com/pftf/RPi4) v1.53 | [NumberOneGit/rpi5-uefi](https://github.com/NumberOneGit/rpi5-uefi) v0.1 (D0 boards; SD boot only) |
-| Onboard Ethernet | `genet0` works (use as LAN) | **Bundled, untested on hardware.** RP1 driver `rp1_eth` (`rp1eth0`) from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules), loaded at boot on a Pi 5 |
-| WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB NIC, unverified |
+| Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [one fix](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 5 ms (~4 ms LAN latency) |
+| WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: an RTL8156 2.5 GbE attaches as `ue0` (`ure`); traffic over it not yet tested |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
-| Verdict | Works today | Experimental: boots; Ethernet driver not yet proven on a board |
+| Verdict | Works today | Experimental: tested on one Pi 5 16 GB (D0): DHCP on `rp1eth0`, SSH, web GUI, API, reboot |
 
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
@@ -49,6 +49,10 @@ Release images are customized on FreeBSD after the firmware step
   (`opnsense/src` 26.7, kernel config `SMP-ARM`), with every symbol checked
   against the image's kernel. They map Pi 5 hardware directly when loaded, so
   the boot hook loads `rp1_eth` and `rpi5` only when SMBIOS says "Raspberry Pi 5".
+  `rp1_eth` finds the hardware through the device tree, so the image's UEFI is
+  preset to System Table Mode **ACPI + Device Tree** ([`uefi/pi5-vars.json`](uefi/pi5-vars.json),
+  written into `RPI_EFI.fd`); FreeBSD still boots on ACPI. Fixes on top of the
+  pinned module commit live in [`patches/rpi5-kmods/`](patches/rpi5-kmods/).
 
 Each image lists what it contains in `/usr/local/etc/opnsense-pi/manifest.txt`
 (also published as `opnsense-<board>.manifest.txt`).
@@ -80,7 +84,8 @@ The hook logs to `/var/log/opnsense-pi.log`.
 1. Update the Pi's EEPROM bootloader first (from Raspberry Pi OS: `sudo rpi-eeprom-update -a`).
 2. Pi 4: press Esc at the UEFI splash. Go to **Device Manager → Raspberry Pi Configuration → Advanced Configuration**,
    set **Limit RAM to 3 GB** to *Disabled*, then save and reset.
-3. On the console (HDMI), assign interfaces: LAN `genet0`, WAN `ue0`.
+3. On the console (HDMI), assign interfaces: LAN `genet0` (Pi 4) or `rp1eth0` (Pi 5), WAN `ue0`.
+   Or skip the console: seed a `config.xml` on the FAT partition (see above).
 4. Browse to https://192.168.1.1 and log in as `root` / `opnsense`. Change the password.
 
 ## Build it
