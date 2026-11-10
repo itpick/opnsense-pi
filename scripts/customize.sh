@@ -54,7 +54,11 @@ case "$kernel" in *" SMP") ;; *) echo "kernel was not built from the SMP config 
 KERNEL_SRC_COMMIT=$(echo "$kernel" | sed -nE 's/.*-n[0-9]+-([0-9a-f]+) .*/\1/p')
 [ -n "$KERNEL_SRC_COMMIT" ] || { echo "cannot find the source commit in the kernel version" >&2; exit 1; }
 export KERNEL_SRC_COMMIT
-grep -q 'rc.syshook import' "$root/etc/rc" || { echo "/etc/rc has no import syshook; the boot hook would never run" >&2; exit 1; }
+# OPNsense core's boot script (installed as /usr/local/etc/rc, which base's
+# /etc/rc hands over to) must run the "import" syshook stage the hook uses.
+rcfile=$(grep -l 'rc.syshook import' "$root/usr/local/etc/rc" "$root/etc/rc" 2>/dev/null | head -1)
+[ -n "$rcfile" ] || { echo "no boot script runs the import syshook; the boot hook would never run" >&2; exit 1; }
+echo ">> import syshook run by ${rcfile#"$root"}"
 
 # Plugins, with the image's own pkg (a newer host pkg could upgrade its database).
 # The chroot gets the build host's DNS; the image's own resolv.conf (file,
