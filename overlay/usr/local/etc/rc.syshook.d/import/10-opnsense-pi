@@ -28,9 +28,23 @@ BOARD='' BOARD_MATCH='' KMODS_LOAD=''
 [ -f /usr/local/etc/opnsense-pi/board.conf ] && . /usr/local/etc/opnsense-pi/board.conf
 
 esp=$(gpart show -p 2>/dev/null | awk '$4 == "efi" { print "/dev/" $3; exit }')
-mnt=/tmp/.opnsense-pi-esp
 drivers=auto
-if [ -n "${esp}" ] && mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} 2>/dev/null; then
+# The image's fstab mounts the ESP (/dev/gpt/efifs) on /boot/efi before this
+# runs; use that mount if it is there, else mount the ESP ourselves.
+mnt=$(mount -p -t msdosfs 2>/dev/null | awk '$2 == "/boot/efi" { print $2; exit }')
+own_mnt=
+if [ -z "${mnt}" ] && [ -n "${esp}" ]; then
+	mnt=/tmp/.opnsense-pi-esp
+	if mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt}; then
+		own_mnt=1
+	else
+		log "could not mount the EFI partition ${esp}"
+		mnt=
+	fi
+fi
+[ -n "${mnt}" ] || [ -n "${esp}" ] || log "no EFI partition found"
+if [ -n "${mnt}" ]; then
+	esp="${esp:-ESP} (${mnt})"
 	dir=${mnt}/opnsense-pi
 	if [ -f ${dir}/config.xml ]; then
 		mkdir -p /conf/backup
@@ -50,7 +64,7 @@ if [ -n "${esp}" ] && mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} 2>/dev/null
 			daemon -f sh -c "sleep $((mins * 60)); echo \"\$(date '+%Y-%m-%dT%H:%M:%S') reboot-after-minutes: rebooting\" >> ${LOG}; /sbin/shutdown -r now"
 		fi
 	fi
-	umount ${mnt}
+	[ -n "${own_mnt}" ] && umount ${mnt}
 fi
 
 if [ -n "${KMODS_LOAD}" ]; then
