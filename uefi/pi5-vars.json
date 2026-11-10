@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "variables": [
+        {
+            "name": "SystemTableMode",
+            "guid": "677a7ac5-7d92-4288-8bf0-97048102d11c",
+            "attr": 7,
+            "data": "01000000"
+        }
+    ]
+}

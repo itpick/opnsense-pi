@@ -10,7 +10,7 @@
     in {
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
-          packages = with pkgs; [ curl gnumake mtools python3 qemu socat unzip util-linux xz gh shellcheck ];
+          packages = with pkgs; [ curl gnumake mtools python3 python3Packages.virt-firmware qemu socat unzip util-linux xz gh shellcheck ];
         };
       });
     };
