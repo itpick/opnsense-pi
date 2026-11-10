@@ -113,7 +113,7 @@ done
 manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 {
 	echo "opnsense-pi $board image"
-	echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+	echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git -c safe.directory="$(pwd)" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 	echo "opnsense: $version"
 	echo "kernel: $kernel"
 	echo "plugins:"
