@@ -31,7 +31,7 @@ esp=$(gpart show -p 2>/dev/null | awk '$4 == "efi" { print "/dev/" $3; exit }')
 drivers=auto
 # The image's fstab mounts the ESP (/dev/gpt/efifs) on /boot/efi before this
 # runs; use that mount if it is there, else mount the ESP ourselves.
-mnt=$(mount -p -t msdosfs 2>/dev/null | awk '$2 == "/boot/efi" { print $2; exit }')
+mnt=$(mount -p 2>/dev/null | awk '$2 == "/boot/efi" && $3 == "msdosfs" { print $2; exit }')
 own_mnt=
 if [ -z "${mnt}" ] && [ -n "${esp}" ]; then
 	mnt=/tmp/.opnsense-pi-esp
