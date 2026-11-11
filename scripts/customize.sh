@@ -48,8 +48,17 @@ mount "$ufs" "$root"
 kernel=$(strings "$root/boot/kernel/kernel" | grep -m1 '^@(#)FreeBSD' | sed 's/^@(#)//')
 version=$(chroot "$root" /usr/local/sbin/opnsense-version)
 echo ">> $board image: $version, kernel $kernel"
-strings "$root/boot/kernel/kernel" | grep -q -E '/SMP$' || { echo "kernel was not built from the SMP config the modules are built for" >&2; exit 1; }
-grep -q 'rc.syshook import' "$root/etc/rc" || { echo "/etc/rc has no import syshook; the boot hook would never run" >&2; exit 1; }
+# e.g. "FreeBSD 15.1-RELEASE-p1 stable/26.7-n283674-12334a596709 SMP": the
+# kernel config's ident is last, the source commit before it.
+case "$kernel" in *" SMP") ;; *) echo "kernel was not built from the SMP config the modules are built for" >&2; exit 1 ;; esac
+KERNEL_SRC_COMMIT=$(echo "$kernel" | sed -nE 's/.*-n[0-9]+-([0-9a-f]+) .*/\1/p')
+[ -n "$KERNEL_SRC_COMMIT" ] || { echo "cannot find the source commit in the kernel version" >&2; exit 1; }
+export KERNEL_SRC_COMMIT
+# OPNsense core's boot script (installed as /usr/local/etc/rc, which base's
+# /etc/rc hands over to) must run the "import" syshook stage the hook uses.
+rcfile=$(grep -l 'rc.syshook import' "$root/usr/local/etc/rc" "$root/etc/rc" 2>/dev/null | head -1)
+[ -n "$rcfile" ] || { echo "no boot script runs the import syshook; the boot hook would never run" >&2; exit 1; }
+echo ">> import syshook run by ${rcfile#"$root"}"
 
 # Plugins, with the image's own pkg (a newer host pkg could upgrade its database).
 # The chroot gets the build host's DNS; the image's own resolv.conf (file,
@@ -66,6 +75,7 @@ for p in $PLUGINS; do
 	chroot "$root" env ASSUME_ALWAYS_YES=yes pkg install -y "$p"
 done
 chroot "$root" pkg clean -ay -q
+plugin_versions=$(chroot "$root" pkg query '  %n %v' | grep -E "$(echo "$PLUGINS" | tr ' ' '|')|realtek" || true)
 rm -f "$root/etc/resolv.conf"
 [ -n "$had_resolv" ] && mv "$root/etc/resolv.conf.opnsense-pi" "$root/etc/resolv.conf"
 umount "$root/dev"
@@ -103,14 +113,15 @@ done
 manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 {
 	echo "opnsense-pi $board image"
-	echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+	echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git -c safe.directory="$(pwd)" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 	echo "opnsense: $version"
 	echo "kernel: $kernel"
 	echo "plugins:"
-	chroot "$root" pkg query '  %n %v' | grep -E "$(echo "$PLUGINS" | tr ' ' '|')|realtek" || true
+	echo "$plugin_versions"
 	if [ "$board" = pi5 ]; then
 		echo "rpi5 modules: $RPI5_KMODS_REPO @ $RPI5_KMODS_REV"
 		echo "  built against $OPNSENSE_SRC_REPO $OPNSENSE_SRC_REF, $OPNSENSE_KERNCONF"
+		for p in patches/rpi5-kmods/*.patch; do [ -f "$p" ] && echo "  patched: $p"; done
 		for k in $RPI5_KMODS_BUILD; do echo "  /boot/modules/$k.ko"; done
 		echo "  loaded at boot on a Pi 5: $RPI5_KMODS_LOAD"
 	fi
@@ -118,13 +129,17 @@ manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 	sed 's/^/  /' "$root/boot/loader.conf"
 } > "$manifest"
 cp "$manifest" "out/opnsense-$board.manifest.txt"
-cp "$root/conf/config.xml" "out/opnsense-$board.config.xml"
+# No /conf/config.xml until first boot, which copies this default (the one the
+# image build set the console in).
+default_config=$root/usr/local/etc/config.xml
+[ -f "$root/conf/config.xml" ] && default_config=$root/conf/config.xml
+cp "$default_config" "out/opnsense-$board.config.xml"
 
 # ESP: a README and the default config next to where a seed goes.
 esp_mnt=$(mktemp -d /tmp/opnsense-pi-esp.XXXXXX)
 mount_msdosfs "$esp" "$esp_mnt"
 mkdir -p "$esp_mnt/opnsense-pi"
-cp "$root/conf/config.xml" "$esp_mnt/opnsense-pi/config.xml.default"
+cp "$default_config" "$esp_mnt/opnsense-pi/config.xml.default"
 cat > "$esp_mnt/opnsense-pi/README.txt" <<'EOF'
 opnsense-pi first-boot settings (read at every boot, before anything starts)
 
@@ -136,6 +151,8 @@ drivers               "auto" (default): load this board's extra drivers only on
                       the board. "force" or "off" to override.
 reboot-after-minutes  A number of minutes: reboot that long after every boot.
                       A safety net for remote installs. Delete it to stop.
+                      These boots save diagnostics here as diag-boot.txt,
+                      diag-running.txt (3 minutes in) and diag-reboot.txt.
 
 The boot hook logs to /var/log/opnsense-pi.log.
 EOF

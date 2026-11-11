@@ -1,0 +1,16 @@
+--- a/rp1_eth.c	2026-11-10 17:08:08
++++ b/rp1_eth.c	2026-11-10 17:08:08
+@@ -1185,6 +1185,13 @@
+ 	if_setdrvflagbits(sc->ifp, IFF_DRV_RUNNING, IFF_DRV_OACTIVE);
+ 
+ 	callout_reset(&sc->tick_ch, hz, rp1eth_tick, sc);
++	/*
++	 * Start the 5 ms RX poll now.  Otherwise only cgem_intr_task arms it,
++	 * and that runs only after an interrupt: without the bcm2712_pcie shim
++	 * (no DSDT override) none ever arrives and received frames are never
++	 * processed.  A real interrupt cancels the poll in cgem_intr_filter.
++	 */
++	callout_reset(&sc->gem_poll, MAX(1, hz / 200), cgem_gem_poll, sc);
+ }
+ 
+ static void

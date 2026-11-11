@@ -13,6 +13,8 @@
 #                         this board's extra kernel modules (see below)
 #   reboot-after-minutes  a number: reboot that many minutes after every boot.
 #                         A safety net for remote installs; delete it to stop.
+#                         Such trial boots also save diagnostics snapshots
+#                         (opnsense-pi-diag) to opnsense-pi/diag-*.txt.
 #
 # Extra kernel modules (e.g. Pi 5 RP1 Ethernet) are listed in
 # /usr/local/etc/opnsense-pi/board.conf. They poke the board's hardware
@@ -28,9 +30,23 @@ BOARD='' BOARD_MATCH='' KMODS_LOAD=''
 [ -f /usr/local/etc/opnsense-pi/board.conf ] && . /usr/local/etc/opnsense-pi/board.conf
 
 esp=$(gpart show -p 2>/dev/null | awk '$4 == "efi" { print "/dev/" $3; exit }')
-mnt=/tmp/.opnsense-pi-esp
-drivers=auto
-if [ -n "${esp}" ] && mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} 2>/dev/null; then
+drivers=auto trial=
+# The image's fstab mounts the ESP (/dev/gpt/efifs) on /boot/efi before this
+# runs; use that mount if it is there, else mount the ESP ourselves.
+mnt=$(mount -p 2>/dev/null | awk '$2 == "/boot/efi" && $3 == "msdosfs" { print $2; exit }')
+own_mnt=
+if [ -z "${mnt}" ] && [ -n "${esp}" ]; then
+	mnt=/tmp/.opnsense-pi-esp
+	if mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt}; then
+		own_mnt=1
+	else
+		log "could not mount the EFI partition ${esp}"
+		mnt=
+	fi
+fi
+[ -n "${mnt}" ] || [ -n "${esp}" ] || log "no EFI partition found"
+if [ -n "${mnt}" ]; then
+	esp="${esp:-ESP} (${mnt})"
 	dir=${mnt}/opnsense-pi
 	if [ -f ${dir}/config.xml ]; then
 		mkdir -p /conf/backup
@@ -47,10 +63,17 @@ if [ -n "${esp}" ] && mkdir -p ${mnt} && mount_msdosfs ${esp} ${mnt} 2>/dev/null
 		mins=$(tr -cd '0-9' < ${dir}/reboot-after-minutes)
 		if [ -n "${mins}" ] && [ "${mins}" -gt 0 ]; then
 			log "reboot-after-minutes: rebooting in ${mins} minutes"
-			daemon -f sh -c "sleep $((mins * 60)); echo \"\$(date '+%Y-%m-%dT%H:%M:%S') reboot-after-minutes: rebooting\" >> ${LOG}; /sbin/shutdown -r now"
+			trial=1
+			# Diagnostics snapshots on the ESP (opnsense-pi-diag): "boot" at the
+			# end of this hook, "running" once the system is up (when there is
+			# time for it), "reboot" just before rebooting.
+			secs=$((mins * 60)) first=0
+			[ ${secs} -gt 300 ] && first=180
+			diag=/usr/local/sbin/opnsense-pi-diag
+			daemon -f sh -c "sleep ${first}; [ ${first} = 0 ] || ${diag} running; sleep $((secs - first)); ${diag} reboot; echo \"\$(date '+%Y-%m-%dT%H:%M:%S') reboot-after-minutes: rebooting\" >> ${LOG}; /sbin/shutdown -r now"
 		fi
 	fi
-	umount ${mnt}
+	[ -n "${own_mnt}" ] && umount ${mnt}
 fi
 
 if [ -n "${KMODS_LOAD}" ]; then
@@ -75,5 +98,7 @@ if [ -n "${KMODS_LOAD}" ]; then
 		log "not loading ${BOARD} modules ${KMODS_LOAD}: ${why}"
 	fi
 fi
+
+[ -n "${trial}" ] && /usr/local/sbin/opnsense-pi-diag boot
 
 exit 0

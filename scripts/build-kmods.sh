@@ -15,7 +15,9 @@ set -eu
 cd "$(dirname "$0")/.."
 . ./versions.env
 root=$1
-work=$(pwd)/.work/kmods
+# Local scratch, not the checkout: in CI the checkout is an NFS share from the
+# host (owned by another uid, which git refuses, and slow to compile on).
+work=/var/tmp/opnsense-pi-kmods
 src=/usr/src
 mkdir -p "$work"
 
@@ -30,6 +32,15 @@ if [ "$(cat $src/.opnsense-pi 2>/dev/null)" != "$OPNSENSE_SRC_REF" ]; then
 	git clone -q --depth 1 --filter=blob:none --sparse -b "$OPNSENSE_SRC_REF" "$OPNSENSE_SRC_REPO" $src
 	git -C $src sparse-checkout set sys
 	echo "$OPNSENSE_SRC_REF" > $src/.opnsense-pi
+fi
+# The image's kernel names its source commit (customize.sh passes it on); the
+# checkout must be that commit, or OPNSENSE_SRC_REF needs bumping.
+head=$(git -C $src rev-parse HEAD)
+if [ -n "${KERNEL_SRC_COMMIT:-}" ]; then
+	case "$head" in
+	"$KERNEL_SRC_COMMIT"*) echo ">> sources at $head match the image kernel" ;;
+	*) echo "$OPNSENSE_SRC_REF is $head, but the image kernel was built from $KERNEL_SRC_COMMIT" >&2; exit 1 ;;
+	esac
 fi
 
 # 2. Kernel option headers for the image's kernel config. SMP-ARM lives in
@@ -53,6 +64,13 @@ rm -rf "$m"
 git clone -q "$RPI5_KMODS_REPO" "$m"
 git -C "$m" checkout -q "$RPI5_KMODS_REV"
 rm -f "$m"/opt_*.h
+# Our fixes on top of the pinned commit (patches/rpi5-kmods/, -p1 from the
+# module repo's root). Each should go upstream; drop it once the pin has it.
+for p in patches/rpi5-kmods/*.patch; do
+	[ -f "$p" ] || continue
+	echo ">> applying $p"
+	patch -s -t -N -p1 -d "$m" < "$p"
+done
 for k in $RPI5_KMODS_BUILD; do
 	echo ">> building $k"
 	make -s -C "$m" MODULE="$k" SYSDIR=$src/sys KERNBUILDDIR="$kb" DEBUG_FLAGS= WITHOUT_DEBUG_FILES=yes

@@ -70,6 +70,25 @@ esp="$img@@$((esp_start * 512))"
 
 echo ">> adding $board UEFI firmware ($(basename "$fw")) to the ESP"
 unzip -q "$fw" -d "$work/fw"
+# Pi 5: preset the UEFI's System Table Mode to ACPI + Device Tree (default:
+# ACPI only). FreeBSD still boots on ACPI, but rp1_eth (the built-in
+# Ethernet) finds its hardware through the device tree and refuses to load
+# without one. The setting is an EFI variable; uefi/pi5-vars.json goes into
+# the variable store inside RPI_EFI.fd. Values from rpi5-uefi's
+# Platform/RaspberryPi/Include/ConfigVars.h: 0 ACPI, 1 both, 2 device tree.
+if [ "$board" = pi5 ]; then
+  command -v virt-fw-vars >/dev/null || { echo "needs virt-fw-vars (pip install virt-firmware)" >&2; exit 1; }
+  echo ">> presetting UEFI variables (uefi/pi5-vars.json)"
+  virt-fw-vars -l warning --input "$work/fw/RPI_EFI.fd" --set-json uefi/pi5-vars.json --output "$work/fw/RPI_EFI.fd.new"
+  mv "$work/fw/RPI_EFI.fd.new" "$work/fw/RPI_EFI.fd"
+  virt-fw-vars -l warning --input "$work/fw/RPI_EFI.fd" --output-json - | python3 -c '
+import json, sys
+want = json.load(open("uefi/pi5-vars.json"))["variables"]
+have = json.load(sys.stdin)["variables"]
+for v in want:
+    assert any(h["name"] == v["name"] and h["guid"] == v["guid"] and h["data"] == v["data"] for h in have), v["name"]
+    print("   " + v["name"] + " = " + v["data"])'
+fi
 export MTOOLS_SKIP_CHECK=1
 mcopy -s -o -i "$esp" "$work/fw"/* ::/
 mdir -/ -b -i "$esp" :: | sed 's/^/   /'
