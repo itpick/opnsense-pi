@@ -14,7 +14,7 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | | Raspberry Pi 4 | Raspberry Pi 5 |
 |---|---|---|
 | UEFI firmware | [pftf/RPi4](https://github.com/pftf/RPi4) v1.53 | [NumberOneGit/rpi5-uefi](https://github.com/NumberOneGit/rpi5-uefi) v0.1 (D0 boards; SD boot only) |
-| Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [one fix](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 5 ms (~4 ms LAN latency) |
+| Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [fixes](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 5 ms (~4 ms LAN latency) |
 | WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: an RTL8156 2.5 GbE attaches as `ue0` (`ure`); traffic over it not yet tested |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
