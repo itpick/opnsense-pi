@@ -1,0 +1,88 @@
+diff --git a/rp1_eth.c b/rp1_eth.c
+index cd2a9d7..fa2d462 100644
+--- a/rp1_eth.c
++++ b/rp1_eth.c
+@@ -156,6 +156,12 @@ vm_offset_t cfg_kva;
+ 	u_int			rxnobufs;
+ 	u_int			rxdmamapfails;
+ 
++	/* RX stall detector (rp1eth_tick). */
++	uint64_t		rx_sw_frames;	/* frames passed to if_input */
++	uint64_t		rx_hw_last, rx_sw_last;
++	int			rx_stall_ticks;
++	u_int			rx_stall_resets;
++
+ 	/* Transmit descriptor ring. */
+ 	struct cgem_tx_desc	*txring;
+ 	bus_addr_t		txring_physaddr;
+@@ -595,6 +601,7 @@ cgem_recv(struct rp1eth_softc *sc)
+ 			m_hd = m_hd->m_next;
+ 			m->m_next = NULL;
+ 			if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
++			sc->rx_sw_frames++;
+ 			if_input(ifp, m);
+ 		}
+ 		NET_EPOCH_EXIT(et);
+@@ -947,6 +954,34 @@ rp1eth_update_speed(sc);
+ 
+ 	cgem_poll_hw_stats(sc);
+ 
++	/*
++	 * RX safety net.  The 5 ms poll chain is the only reliable RX
++	 * trigger, and if it is ever lost (or the ring gets out of step
++	 * with the hardware) receive stops for good while TX keeps
++	 * working.  Kick the interrupt task every tick, which drains the
++	 * ring and re-arms the poll; and if the MAC keeps counting
++	 * received frames that never reach if_input, reinitialize it.
++	 */
++	if (sc->link_up && sc->stats.rx_frames != sc->rx_hw_last &&
++	    sc->rx_sw_frames == sc->rx_sw_last) {
++		if (++sc->rx_stall_ticks >= 3) {
++			printf("rp1_eth: RX stalled (%ju frames received by "
++			    "the MAC, none delivered), reinitializing\n",
++			    (uintmax_t)(sc->stats.rx_frames - sc->rx_hw_last));
++			sc->rx_stall_resets++;
++			if_setdrvflagbits(sc->ifp, 0, IFF_DRV_RUNNING);
++			cgem_stop(sc);
++			cgem_init_locked(sc);
++			return;		/* cgem_init_locked rescheduled us */
++		}
++	} else {
++		sc->rx_stall_ticks = 0;
++		sc->rx_hw_last = sc->stats.rx_frames;
++		sc->rx_sw_last = sc->rx_sw_frames;
++	}
++	atomic_set_32(&sc->intr_pending, CGEM_INTR_RX_COMPLETE);
++	taskqueue_enqueue(taskqueue_fast, &sc->intr_task);
++
+ reschedule:
+ 	callout_reset(&sc->tick_ch, hz, rp1eth_tick, sc);
+ }
+@@ -1180,10 +1215,18 @@ cgem_init_locked(struct rp1eth_softc *sc)
+ 		return;
+ 
+ 	cgem_config(sc);
++	/*
++	 * cgem_config clears the hash/promisc bits; reprogram them, or
++	 * multicast (IPv6 ND) is dropped after every down/up.
++	 */
++	cgem_rx_filter(sc);
+ 	cgem_fill_rqueue(sc);
+ 
+ 	if_setdrvflagbits(sc->ifp, IFF_DRV_RUNNING, IFF_DRV_OACTIVE);
+ 
++	sc->rx_stall_ticks = 0;
++	sc->rx_hw_last = sc->stats.rx_frames;
++	sc->rx_sw_last = sc->rx_sw_frames;
+ 	callout_reset(&sc->tick_ch, hz, rp1eth_tick, sc);
+ 	/*
+ 	 * Start the 5 ms RX poll now.  Otherwise only cgem_intr_task arms it,
+@@ -1396,6 +1439,8 @@ rp1eth_add_sysctls(struct rp1eth_softc *sc, struct sysctl_oid *parent)
+ 	    &sc->rxoverruns, 0, "Receive overrun events");
+ 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "_rxnobufs", CTLFLAG_RD,
+ 	    &sc->rxnobufs, 0, "Receive ring empty events");
++	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "_rxstallresets", CTLFLAG_RD,
++	    &sc->rx_stall_resets, 0, "RX stalls recovered by reinitializing");
+ 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "_rxdmamapfails", CTLFLAG_RD,
+ 	    &sc->rxdmamapfails, 0, "Receive DMA map failures");
+ 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "_txfull", CTLFLAG_RD,
