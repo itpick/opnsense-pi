@@ -11,6 +11,9 @@
 #                         /conf/backup/)
 #   drivers               "auto" (default), "force" or "off": whether to load
 #                         this board's extra kernel modules (see below)
+#   ifnames               "<mac> <name>" lines: give those NICs those names
+#                         (see pin_ifnames below); copied to
+#                         /usr/local/etc/opnsense-pi/ifnames on every boot
 #   reboot-after-minutes  a number: reboot that many minutes after every boot.
 #                         A safety net for remote installs; delete it to stop.
 #                         Such trial boots also save diagnostics snapshots
@@ -19,6 +22,10 @@
 # Extra kernel modules (e.g. Pi 5 RP1 Ethernet) are listed in
 # /usr/local/etc/opnsense-pi/board.conf. They poke the board's hardware
 # directly when loaded, so "auto" only loads them when SMBIOS names the board.
+#
+# On arm64 a config whose Suricata pattern matcher is Hyperscan (MPMAlgo "hs",
+# x86 only, common in configs moved from an x86 box) is switched to "ac", or
+# Suricata would not start.
 
 LOG=/var/log/opnsense-pi.log
 log() {
@@ -26,6 +33,7 @@ log() {
 	mkdir -p /var/log && echo "$(date '+%Y-%m-%dT%H:%M:%S') $*" >> ${LOG}
 }
 
+IFNAMES=/usr/local/etc/opnsense-pi/ifnames
 BOARD='' BOARD_MATCH='' KMODS_LOAD=''
 [ -f /usr/local/etc/opnsense-pi/board.conf ] && . /usr/local/etc/opnsense-pi/board.conf
 
@@ -57,6 +65,10 @@ if [ -n "${mnt}" ]; then
 		else
 			log "could not install config.xml from ${esp}"
 		fi
+	fi
+	if [ -f ${dir}/ifnames ]; then
+		mkdir -p ${IFNAMES%/*}
+		tr -d '\r' < ${dir}/ifnames > ${IFNAMES} && log "using ifnames from ${esp}"
 	fi
 	[ -f ${dir}/drivers ] && drivers=$(tr -cd 'a-z' < ${dir}/drivers)
 	if [ -f ${dir}/reboot-after-minutes ]; then
@@ -98,6 +110,81 @@ if [ -n "${KMODS_LOAD}" ]; then
 		log "not loading ${BOARD} modules ${KMODS_LOAD}: ${why}"
 	fi
 fi
+
+# Interface names by MAC address. USB NICs (ue0, ue1, ...) are named in the
+# order their USB controllers finish attaching, which can change from one boot
+# to the next, so with two of them the LAN and WAN (say) can swap. IFNAMES
+# holds "<mac> <name>" lines; matching NICs are renamed before OPNsense sets up
+# any interface. Without the file, the first boot that finds USB NICs records
+# their MACs and names, and later boots keep those names.
+mac_of() { ifconfig "$1" ether 2>/dev/null | awk '$1 == "ether" { print $2; exit }'; }
+if_with_mac() {
+	for i in $(ifconfig -l ether); do
+		[ "$(mac_of ${i})" = "$1" ] && { echo ${i}; return; }
+	done
+}
+usb_nics() { ifconfig -l ether | tr ' ' '\n' | grep -E '^ue[0-9]+$'; }
+pin_ifnames() {
+	if [ ! -f ${IFNAMES} ]; then
+		# Let the USB NICs finish attaching (the list stops changing).
+		prev= n=0
+		while [ ${n} -lt 10 ]; do
+			cur=$(usb_nics | tr '\n' ' ')
+			[ -n "${cur}" ] && [ "${cur}" = "${prev}" ] && break
+			prev=${cur}; n=$((n + 1)); sleep 1
+		done
+		[ -n "$(usb_nics)" ] || return 0
+		mkdir -p ${IFNAMES%/*}
+		{
+			echo "# <mac> <name>: interface names pinned by opnsense-pi (see 10-opnsense-pi)"
+			for i in $(usb_nics); do echo "$(mac_of ${i}) ${i}"; done
+		} > ${IFNAMES}
+		log "recorded USB NIC names: $(grep -v '^#' ${IFNAMES} | tr '\n' ' ')"
+		return 0
+	fi
+	pins=$(awk '!/^[[:space:]]*(#|$)/ && NF >= 2 { print tolower($1) "=" $2 }' ${IFNAMES})
+	[ -n "${pins}" ] || return 0
+	# Wait up to 15 s for every listed NIC to appear.
+	n=0
+	while [ ${n} -lt 15 ]; do
+		missing=
+		for p in ${pins}; do [ -n "$(if_with_mac ${p%%=*})" ] || missing=1; done
+		[ -z "${missing}" ] && break
+		n=$((n + 1)); sleep 1
+	done
+	# Two passes through temporary names, so names can be swapped.
+	k=0 moved=
+	for p in ${pins}; do
+		mac=${p%%=*}
+		want=${p#*=}
+		cur=$(if_with_mac ${mac})
+		[ -n "${cur}" ] || { log "pin_ifnames: no NIC with MAC ${mac} (for ${want})"; continue; }
+		[ "${cur}" = "${want}" ] && continue
+		ifconfig ${cur} name pin${k} >/dev/null && moved="${moved} pin${k}=${want}=${cur}"
+		k=$((k + 1))
+	done
+	for m in ${moved}; do
+		tmp=${m%%=*}
+		rest=${m#*=}
+		want=${rest%%=*}
+		was=${rest#*=}
+		if ifconfig -l | tr ' ' '\n' | grep -qx "${want}"; then
+			log "pin_ifnames: ${want} is taken by another NIC; keeping ${was}"
+			ifconfig ${tmp} name ${was} >/dev/null
+		elif ifconfig ${tmp} name ${want} >/dev/null; then
+			log "pin_ifnames: ${was} -> ${want}"
+		fi
+	done
+}
+pin_ifnames
+
+case "$(uname -p)" in
+aarch64|arm64)
+	if grep -q '<MPMAlgo>hs</MPMAlgo>' /conf/config.xml 2>/dev/null; then
+		sed -i '' 's|<MPMAlgo>hs</MPMAlgo>|<MPMAlgo>ac</MPMAlgo>|' /conf/config.xml &&
+			log "Suricata: switched MPMAlgo hs (Hyperscan is x86 only) to ac"
+	fi ;;
+esac
 
 [ -n "${trial}" ] && /usr/local/sbin/opnsense-pi-diag boot
 
