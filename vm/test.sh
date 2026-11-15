@@ -14,7 +14,9 @@
 #                                 seed was applied, os-realtek-re is installed
 #                                 and if_re.ko loaded at boot, and on pi5 the
 #                                 RP1 modules are installed but, this not being
-#                                 a Pi 5, not loaded
+#                                 a Pi 5, not loaded; NIC names are pinned by MAC
+#                                 (ifnames swaps vtnet0/vtnet1, LAN is seeded on
+#                                 vtnet1) and Suricata's MPMAlgo hs becomes ac
 #   vm/test.sh trial  [pi5|pi4]   customized image with reboot-after-minutes=3:
 #                                 check it reboots by itself
 #
@@ -22,7 +24,7 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 test=${1:-} profile=${2:-pi5}
-case "$profile" in pi5) gui=8443 ssh=2222 ;; pi4) gui=8444 ssh=2223 ;; *) echo "bad profile: $profile" >&2; exit 2 ;; esac
+case "$profile" in pi5) gui=8443 ssh=2222 mac=01 ;; pi4) gui=8444 ssh=2223 mac=02 ;; *) echo "bad profile: $profile" >&2; exit 2 ;; esac
 dir="$root/.work/vm/$profile"
 
 stop() { [[ -f "$dir/qemu.pid" ]] && kill "$(cat "$dir/qemu.pid")" 2>/dev/null || true; }
@@ -60,11 +62,25 @@ test_image() {
   echo "$t"
 }
 
-# Seed config (hostname + SSH key) for a customized image.
+# Seed config (hostname + SSH key) for a customized image. LAN and WAN are
+# assigned swapped (LAN vtnet1, WAN vtnet0) and ifnames swaps the two NICs'
+# names by MAC (vm/run.sh's MACs), so the LAN is only reachable if the boot
+# hook pins names before OPNsense sets up interfaces. The Suricata matcher is
+# seeded as Hyperscan ("hs"), which the hook must switch to "ac" on arm64.
 seed() {
   [[ -f "$dir/id_test" ]] || ssh-keygen -q -t ed25519 -N '' -f "$dir/id_test"
   python3 "$root/scripts/seed-config.py" "$root/out/opnsense-$profile.config.xml" "$dir/seed.xml" \
-    --hostname opnsense-pi-test --ssh-key "$dir/id_test.pub"
+    --hostname opnsense-pi-test --ssh-key "$dir/id_test.pub" --lan vtnet1 --wan vtnet0
+  python3 - "$dir/seed.xml" <<'EOF'
+import sys, xml.etree.ElementTree as ET
+t = ET.parse(sys.argv[1]); o = t.getroot().find("OPNsense")
+def sub(parent, tag, **attrs):
+    e = parent.find(tag)
+    return e if e is not None else ET.SubElement(parent, tag, **attrs)
+sub(sub(sub(o, "IDS", version="1.1.0"), "general"), "MPMAlgo").text = "hs"
+t.write(sys.argv[1], encoding="utf-8", xml_declaration=True)
+EOF
+  printf '52:54:00:4c:41:%s vtnet1\n52:54:00:57:41:%s vtnet0\n' "$mac" "$mac" >"$dir/ifnames"
 }
 
 # Run a sh script as root over SSH (stdin, so root's login shell does not matter).
@@ -102,7 +118,7 @@ case "$test" in
     [[ -f "$root/out/opnsense-$profile.config.xml" ]] && customized=1
     if [[ -n "$customized" ]]; then
       seed
-      img=$(test_image "config.xml=$dir/seed.xml")
+      img=$(test_image "config.xml=$dir/seed.xml" "ifnames=$dir/ifnames")
     else
       img=$(test_image)
     fi
@@ -115,6 +131,12 @@ case "$test" in
       [[ "$(vssh hostname)" == opnsense-pi-test* ]] || fail "hostname is $(vssh hostname), not the seeded one"
       ok "seeded hostname"
       vssh 'grep -q "installed config.xml" /var/log/opnsense-pi.log' || fail "boot hook did not log the seed"
+      vssh 'grep -q "pin_ifnames: vtnet0 -> vtnet1" /var/log/opnsense-pi.log && grep -q "pin_ifnames: vtnet1 -> vtnet0" /var/log/opnsense-pi.log' \
+        || fail "boot hook did not swap vtnet0/vtnet1 by MAC"
+      ok "NIC names pinned by MAC (ifnames swapped vtnet0/vtnet1; LAN answered on vtnet1)"
+      vssh '! grep -q "<MPMAlgo>hs</MPMAlgo>" /conf/config.xml && grep -q "<MPMAlgo>ac</MPMAlgo>" /conf/config.xml && grep -q "switched MPMAlgo hs" /var/log/opnsense-pi.log' \
+        || fail "boot hook did not switch Suricata MPMAlgo hs to ac"
+      ok "Suricata MPMAlgo hs switched to ac on arm64"
       vssh 'pkg info -e os-realtek-re && kldstat -n if_re.ko >/dev/null' || fail "os-realtek-re not installed or if_re.ko not loaded"
       ok "os-realtek-re installed, if_re.ko loaded at first boot"
       if [[ $profile == pi5 ]]; then
@@ -130,7 +152,7 @@ case "$test" in
     [[ -f "$root/out/opnsense-$profile.config.xml" ]] || fail "trial needs a customized image"
     seed
     echo 3 >"$dir/reboot-after-minutes"
-    img=$(test_image "config.xml=$dir/seed.xml" "reboot-after-minutes=$dir/reboot-after-minutes")
+    img=$(test_image "config.xml=$dir/seed.xml" "ifnames=$dir/ifnames" "reboot-after-minutes=$dir/reboot-after-minutes")
     "$root/vm/run.sh" "--$profile" --headless --reset --image "$img"
     wait_ssh || fail "SSH never worked"
     vssh 'grep -q "rebooting in 3 minutes" /var/log/opnsense-pi.log' || fail "boot hook did not schedule the reboot"

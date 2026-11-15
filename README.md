@@ -15,10 +15,10 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 |---|---|---|
 | UEFI firmware | [pftf/RPi4](https://github.com/pftf/RPi4) v1.53 | [NumberOneGit/rpi5-uefi](https://github.com/NumberOneGit/rpi5-uefi) v0.1 (D0 boards; SD boot only) |
 | Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [fixes](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 5 ms (~4 ms LAN latency) |
-| WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: an RTL8156 2.5 GbE attaches as `ue0` (`ure`); traffic over it not yet tested |
+| WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: RTL8156 2.5 GbE adapters (`0bda:8156`) attach as `ue0`, `ue1`, ... (`ure`) and carry traffic; with more than one, pin their names (`ifnames`, below) |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
-| Verdict | Works today | Experimental: tested on one Pi 5 16 GB (D0): DHCP on `rp1eth0`, SSH, web GUI, API, reboot |
+| Verdict | Works today | Experimental, but in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
 
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
@@ -67,6 +67,7 @@ before OPNsense configures anything:
 |---|---|
 | `config.xml` | Installed as `/conf/config.xml` once, then renamed to `config.xml.applied`. Start from `config.xml.default` next to it, or use a backup from another OPNsense. |
 | `drivers` | `auto` (default), `force` or `off`: whether to load the board's extra drivers. |
+| `ifnames` | `<mac> <name>` lines: give the NICs with those MACs those names, before OPNsense sets up interfaces. USB NICs are named in the order they attach, which can change between boots, so two USB adapters (`ue0`, `ue1`) can swap LAN and WAN. Without this file the first boot that finds USB NICs records their names in `/usr/local/etc/opnsense-pi/ifnames` and keeps them from then on; edit that file (or put one here) to change them. |
 | `reboot-after-minutes` | Reboot that many minutes after every boot: a safety net for remote installs. Delete it to stop. |
 
 [`scripts/seed-config.py`](scripts/seed-config.py) makes a `config.xml` from the default with a
@@ -78,6 +79,11 @@ scripts/seed-config.py opnsense-pi5.config.xml config.xml \
 ```
 
 The hook logs to `/var/log/opnsense-pi.log`.
+
+Moving a config from an x86 OPNsense: rename the interfaces (`<if>` in
+`config.xml`) to the Pi's (`rp1eth0`, `ue0`, ...). Suricata's Hyperscan pattern
+matcher (`MPMAlgo` `hs`) is x86 only; the hook switches it to `ac` at boot, or
+Suricata would not start.
 
 ### First boot
 
@@ -121,7 +127,8 @@ make vm BOARD=pi5          # serial console here; Ctrl-a x quits
 make test-plugin BOARD=pi5 # install os-realtek-re, reboot, check if_re.ko loads
 make test-image  BOARD=pi4 # boot the built image; for a customized one also seed a
                            # config.xml, then check over SSH: seed applied, if_re.ko
-                           # loaded, Pi 5 modules installed but skipped on the VM
+                           # loaded, Pi 5 modules installed but skipped on the VM,
+                           # NIC names pinned by MAC, Suricata hs switched to ac
 make test-trial  BOARD=pi5 # reboot-after-minutes reboots the image by itself
 make test                  # everything, both boards
 ```
