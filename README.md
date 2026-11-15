@@ -20,6 +20,12 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
 | Verdict | Works today | Experimental, but in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
 
+USB NICs in daily use on the Pi 5: two [WAVLINK USB C to Ethernet Adapter 2.5 Gbps](https://a.co/d/0d9jG2Pi)
+(RTL8156, `0bda:8156`) on the USB 3 ports, linked at 1 and
+2.5 Gb/s. Any RTL8156/RTL8156B adapter should behave the same. 5 GbE USB adapters (such as
+WAVLINK's [5 Gbps version](https://a.co/d/007RQrjE)) usually use the RTL8157, which FreeBSD
+15.1's `ure` driver does not support, so they are not expected to work.
+
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
 ## Flash it
