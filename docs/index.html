@@ -46,6 +46,13 @@
     border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
   ol { padding-left: 20px; } li { margin: 4px 0; }
   code { background: var(--code); border-radius: 4px; padding: 1px 5px; font-size: .9em; }
+  .tbl { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; background: var(--card); }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fine { color: var(--muted); font-size: .85rem; }
   footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
   footer a, p a, li a { color: var(--accent); }
 </style>
@@ -85,6 +92,28 @@
   </div>
 
   <p class="note" style="background:var(--code);color:var(--fg)">Prefer Linux? <a href="https://itpick.github.io/sensr/">sensr</a> is a Rust firewall OS on NixOS, built from what we learned here: it uses mainline Pi 5 Ethernet and RTL8157 support, and NixOS rollback. It is in planning; there are no images yet.</p>
+
+  <h3 id="pi5-numbers">Pi 5 boot time and LAN port speed</h3>
+  <p>Measured on a live home router running this image: a Pi 5, 16&nbsp;GB, OPNsense 26.7.9_1, on 2026-11-16.</p>
+  <div class="tbl"><table>
+    <tr><th>Boot time, from the reboot command</th><th>Typical (7 reboots)</th></tr>
+    <tr><td>Kernel starts (shutdown + Pi firmware + UEFI + loader)</td><td class="n">36&ndash;38 s</td></tr>
+    <tr><td>Network up (LAN interface configured)</td><td class="n">64&ndash;67 s</td></tr>
+    <tr><td>Management up (SSH and web GUI)</td><td class="n">65&ndash;68 s</td></tr>
+    <tr><td>Ready (boot finished)</td><td class="n">81&ndash;85 s</td></tr>
+  </table></div>
+  <p class="fine">From the router's own boot logs (1&nbsp;s resolution) for 10 reboots on 2026-11-15/16; one after a crash and two slower ones (up to 102&nbsp;s to ready) are left out of the range. An external ping every 5&nbsp;s saw the first reply 72&ndash;74&nbsp;s after the reboot.</p>
+  <p>iperf3 between a wired 1&nbsp;GbE Mac and the router's LAN port (USB RTL8156, linked at 1&nbsp;Gb/s), 15&nbsp;s runs:</p>
+  <div class="tbl"><table>
+    <tr><th>Test</th><th>Mbit/s</th><th>Router CPU</th></tr>
+    <tr><td>TCP in, 1 stream</td><td class="n">591&ndash;594</td><td class="n">22&ndash;23%</td></tr>
+    <tr><td>TCP in, 4 streams</td><td class="n">600&ndash;612</td><td class="n">24&ndash;29%</td></tr>
+    <tr><td>TCP out, 1 stream</td><td class="n">922&ndash;928</td><td class="n">23&ndash;33%</td></tr>
+    <tr><td>TCP out, 4 streams</td><td class="n">931&ndash;932</td><td class="n">23&ndash;24%</td></tr>
+    <tr><td>UDP in at 1&nbsp;Gb/s</td><td class="n">953, 0.8% loss</td><td class="n">20%</td></tr>
+    <tr><td>UDP out at 1&nbsp;Gb/s</td><td class="n">930, 0.04% loss</td><td class="n">40%</td></tr>
+  </table></div>
+  <p class="fine">These end on the router itself, so they measure the NIC, driver and CPU, not routing or NAT; the router was carrying household traffic at the time. 940&nbsp;Mbit/s is the 1&nbsp;GbE limit. Method and raw data, side by side with VyOS on the same board type: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Pi 5 comparison</a>.</p>
 
   <h3>One-liner (Linux)</h3>
   <p>Writes the Pi 4 image straight to a disk. Replace <code>/dev/sdX</code>; everything on it is erased.</p>
