@@ -63,7 +63,7 @@
   details.x86 { margin: 12px 0; }
   details.x86 summary { cursor: pointer; color: var(--muted); font-size: .9rem; font-weight: 600; }
   footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
-  footer a, p a, li a { color: var(--accent); }
+  footer a, p a, li a, td a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -76,7 +76,7 @@
     <ul>
       <li><a href="https://itpick.github.io/vyos-pi/">vyos-pi</a>: VyOS images for Raspberry Pi 4/5</li>
       <li><a href="https://itpick.github.io/sensr/">sensr</a>: Rust + NixOS firewall OS, an OPNsense remake (in development)</li>
-      <li><a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">OPNsense vs VyOS on the Pi 5</a>: side-by-side speed and boot-time results (<a href="#startup">startup table</a>)</li>
+      <li><a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">OPNsense vs VyOS on the Pi 5</a>: side-by-side speed and boot-time results (<a href="#vs-vyos">live router results</a> &middot; <a href="#startup">startup table</a>)</li>
     </ul>
   </aside>
 
@@ -131,14 +131,15 @@
   <p>Measured on a live home router running this image: a Pi 5, 16&nbsp;GB, OPNsense 26.7.9_1, on 2026-11-16.</p>
   <p>iperf3 between a wired 1&nbsp;GbE Mac and the router's LAN port (USB RTL8156, linked at 1&nbsp;Gb/s), 15&nbsp;s runs:</p>
   <div class="tbl"><table>
-    <tr><th>Test</th><th>Mbit/s</th><th>Router CPU</th></tr>
-    <tr><td>TCP in, 1 stream</td><td class="n">591&ndash;594</td><td class="n">22&ndash;23%</td></tr>
-    <tr><td>TCP in, 4 streams</td><td class="n">600&ndash;612</td><td class="n">24&ndash;29%</td></tr>
-    <tr><td>TCP out, 1 stream</td><td class="n">922&ndash;928</td><td class="n">23&ndash;33%</td></tr>
-    <tr><td>TCP out, 4 streams</td><td class="n">931&ndash;932</td><td class="n">23&ndash;24%</td></tr>
-    <tr><td>UDP in at 1&nbsp;Gb/s</td><td class="n">953, 0.8% loss</td><td class="n">20%</td></tr>
-    <tr><td>UDP out at 1&nbsp;Gb/s</td><td class="n">930, 0.04% loss</td><td class="n">40%</td></tr>
+    <tr><th>Test</th><th>OPNsense Mbit/s</th><th>OPNsense CPU</th><th>VyOS Mbit/s <span class="fine">(same router role, USB RTL8156 LAN)</span></th></tr>
+    <tr><td>TCP in, 1 stream</td><td class="n">591&ndash;594</td><td class="n">22&ndash;23%</td><td class="n">911&ndash;916</td></tr>
+    <tr><td>TCP in, 4 streams</td><td class="n">600&ndash;612</td><td class="n">24&ndash;29%</td><td class="n">862&ndash;871</td></tr>
+    <tr><td>TCP out, 1 stream</td><td class="n">922&ndash;928</td><td class="n">23&ndash;33%</td><td class="n">911&ndash;923</td></tr>
+    <tr><td>TCP out, 4 streams</td><td class="n">931&ndash;932</td><td class="n">23&ndash;24%</td><td class="n">927&ndash;928</td></tr>
+    <tr><td>UDP in at 1&nbsp;Gb/s</td><td class="n">953, 0.8% loss</td><td class="n">20%</td><td class="n">952, 0.7&ndash;0.8% loss</td></tr>
+    <tr><td>UDP out at 1&nbsp;Gb/s</td><td class="n">930, 0.04% loss</td><td class="n">40%</td><td class="n">922&ndash;944, 0.02&ndash;0.3% loss</td></tr>
   </table></div>
+  <p class="fine">The VyOS column is <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a> after it replaced this router on the same day: the same Mac, switch and USB RTL8156 chip, but a different board and a different adapter unit. It was a live router too, also running ntopng.</p>
   <p class="fine">These end on the router itself, so they measure the NIC, driver and CPU, not routing or NAT; the router was carrying household traffic at the time. 940&nbsp;Mbit/s is the 1&nbsp;GbE limit. Method and raw data, side by side with VyOS on the same board type: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Pi 5 comparison</a>.</p>
 
 
@@ -159,8 +160,18 @@
     <tr><td>Each blue USB 3.0 port</td><td>5&nbsp;Gbit/s signalling (USB 3.x Gen 1, 8b/10b coding), so at most 4&nbsp;Gbit/s of data. A 5&nbsp;GbE RTL8157 dongle can link at 5&nbsp;Gbit/s, but on a PC's Gen 1 port it moved <a href="https://lkml.iu.edu/hypermail/linux/kernel/2604.0/06464.html">3.47&nbsp;Gbit/s</a> in iperf3 (4.70 on Gen 2). Expect about 3.5&nbsp;Gbit/s per port. Each port has its own USB controller in the RP1 chip.</td></tr>
     <tr><td>RP1 &harr; SoC</td><td><a href="https://www.raspberrypi.com/news/rp1-the-silicon-controlling-raspberry-pi-5-i-o-designed-here-at-raspberry-pi/">PCIe 2.0 x4</a>, about 16&nbsp;Gbit/s each way, shared by both USB ports and the onboard Ethernet. It is not the limit with two dongles.</td></tr>
     <tr><td>Driver</td><td>FreeBSD's <code>ure</code> driver stops at the RTL8156: it has no RTL8157 support, in FreeBSD 15.1 (OPNsense 26.7) or in FreeBSD's main branch as of November 2026. 2.5&nbsp;GbE (RTL8156) is the fastest supported USB NIC, about 2.35&nbsp;Gbit/s per port.</td></tr>
-    <tr><td>Through the router</td><td>The lowest of the WAN port, the LAN port and what the CPU can forward. The firewall rules, NAT and Suricata set the real figure. <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Measured so far</a>.</td></tr>
+    <tr><td>Through the router</td><td>The lowest of the WAN port, the LAN port and what the CPU can forward. The firewall rules, NAT and Suricata set the real figure. Measured so far: <a href="#vs-vyos">through NAT on a live router</a> and <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">to the router itself</a>.</td></tr>
   </table></div>
+
+  <h3 id="vs-vyos">Live router: OPNsense vs VyOS through NAT, with Suricata</h3>
+  <p>The same tests, run on this router and then on <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a> after it replaced it (same Pi 5 model, same Mac, same public iperf3 servers, 15&nbsp;s runs, household traffic flowing). Mbit/s with 8 streams:</p>
+  <div class="tbl"><table>
+    <tr><th>Suricata</th><th>OPNsense down / up</th><th>VyOS down / up</th></tr>
+    <tr><td>Stopped</td><td class="n">664 / 441</td><td class="n">591&ndash;790 / 714&ndash;718</td></tr>
+    <tr><td>IDS on WAN, ET Open rules loaded</td><td class="n">478 / 340</td><td class="n">544 / 635</td></tr>
+    <tr><td>IPS on WAN (blocking)</td><td class="n">264 / 192</td><td class="n">363 / 374</td></tr>
+  </table></div>
+  <p class="fine">The public servers cap these numbers, not the routers: repeating a state varied by about &plusmn;25%. VyOS was also running ntopng and AdGuard Home. On both, IDS on the NATed WAN with HOME_NET set to private ranges matches almost no ET rules. Every state, latency, CPU and the detection probes: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/vyos-pi-live.md">VyOS live-router results</a>, side by side with the <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/opnsense-pi-baseline.md">OPNsense baseline</a>.</p>
 
   <h3>One-liner (Linux)</h3>
   <p>Writes the Pi 4 image straight to a disk. Replace <code>/dev/sdX</code>; everything on it is erased.</p>
