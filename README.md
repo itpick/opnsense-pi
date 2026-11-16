@@ -5,6 +5,8 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 
 **Download page:** https://itpick.github.io/opnsense-pi/
 
+Looking for a Linux base? [sensr](https://github.com/itpick/sensr) is a Rust firewall OS on NixOS built from this project's lessons (in planning).
+
 > Unofficial. Built from the community aarch64 images
 > ([maurice-w/opnsense-vm-images](https://github.com/maurice-w/opnsense-vm-images)),
 > which Deciso does not support. Use it for labs and learning. Keep a working router nearby.
