@@ -9,7 +9,7 @@ Looking for a Linux base? [sensr](https://github.com/itpick/sensr) is a Rust fir
 
 > Unofficial. Built from the community aarch64 images
 > ([maurice-w/opnsense-vm-images](https://github.com/maurice-w/opnsense-vm-images)),
-> which Deciso does not support. Use it for labs and learning. Keep a working router nearby.
+> which Deciso does not support.
 
 ## Board status
 
