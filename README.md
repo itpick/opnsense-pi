@@ -5,7 +5,10 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 
 **Download page:** https://itpick.github.io/opnsense-pi/
 
-Looking for a Linux base? [sensr](https://github.com/itpick/sensr) is a Rust firewall OS on NixOS built from this project's lessons (in planning).
+**Related projects:**
+- [vyos-pi](https://github.com/itpick/vyos-pi) ([download page](https://itpick.github.io/vyos-pi/)): VyOS images for Raspberry Pi 4/5
+- [sensr](https://github.com/itpick/sensr) ([page](https://itpick.github.io/sensr/)): Rust + NixOS firewall OS, an OPNsense remake (in development)
+- [OPNsense vs VyOS on the Pi 5](https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md): side-by-side speed and boot-time results
 
 > Unofficial. Built from the community aarch64 images
 > ([maurice-w/opnsense-vm-images](https://github.com/maurice-w/opnsense-vm-images)),

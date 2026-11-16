@@ -56,6 +56,10 @@
   td.n .fine { white-space: normal; font-size: .78rem; }
   tr.grp td { background: var(--code); font-weight: 600; font-size: .8rem; padding: 5px 10px; }
   .startup td.n { white-space: normal; }
+  .related { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 16px 0 20px; font-size: .9rem; }
+  .related ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); }
+  .related li { margin: 2px 0; }
+  .related a { color: var(--accent); }
   footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
   footer a, p a, li a { color: var(--accent); }
 </style>
@@ -65,7 +69,14 @@
   <h1>OPNsense for Raspberry Pi</h1>
   <p class="sub">Flash-and-boot OPNsense 26.7 (FreeBSD 15.1) images. The UEFI firmware is already on the disk.</p>
   <p class="note">Unofficial community build, not supported by Deciso.</p>
-  <p class="sub"><strong>OPNsense vs VyOS on the Pi 5:</strong> <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">side-by-side speed and boot-time results</a> &middot; <a href="https://itpick.github.io/vyos-pi/">VyOS for Raspberry Pi</a></p>
+  <aside class="related" aria-label="Related projects">
+    <strong>Related projects</strong>
+    <ul>
+      <li><a href="https://itpick.github.io/vyos-pi/">vyos-pi</a>: VyOS images for Raspberry Pi 4/5</li>
+      <li><a href="https://itpick.github.io/sensr/">sensr</a>: Rust + NixOS firewall OS, an OPNsense remake (in development)</li>
+      <li><a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">OPNsense vs VyOS on the Pi 5</a>: side-by-side speed and boot-time results (<a href="#startup">startup table</a>)</li>
+    </ul>
+  </aside>
 
   <div class="boards">
     <div class="card">
@@ -94,8 +105,6 @@
       <div class="small"><a href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi5.img.xz.sha256">sha256</a></div>
     </div>
   </div>
-
-  <p class="note" style="background:var(--code);color:var(--fg)">Prefer Linux? <a href="https://itpick.github.io/sensr/">sensr</a> is a Rust firewall OS on NixOS, built from what we learned here: it uses mainline Pi 5 Ethernet and RTL8157 support, and NixOS rollback. It is in planning; there are no images yet.</p>
 
   <h3 id="startup">Startup: time until traffic flows and until you can manage it</h3>
   <div class="tbl"><table class="startup">
@@ -147,7 +156,7 @@
 
   <footer>
     Source, VM tests and build scripts: <a href="https://github.com/itpick/opnsense-pi">github.com/itpick/opnsense-pi</a>.
-    The sibling project for VyOS: <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a>.
+    Related: <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a> (VyOS images for Raspberry Pi 4/5) and <a href="https://itpick.github.io/sensr/">sensr</a> (Rust + NixOS firewall OS, in development).
     Built from <a href="https://github.com/maurice-w/opnsense-vm-images">maurice-w/opnsense-vm-images</a>,
     <a href="https://github.com/pftf/RPi4">pftf/RPi4</a> and
     <a href="https://github.com/NumberOneGit/rpi5-uefi">NumberOneGit/rpi5-uefi</a>.
