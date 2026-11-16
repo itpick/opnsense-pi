@@ -56,6 +56,10 @@
   td.n .fine { white-space: normal; font-size: .78rem; }
   tr.grp td { background: var(--code); font-weight: 600; font-size: .8rem; padding: 5px 10px; }
   .startup td.n { white-space: normal; }
+  .related { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 16px 0 20px; font-size: .9rem; }
+  .related ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); }
+  .related li { margin: 2px 0; }
+  .related a { color: var(--accent); }
   footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
   footer a, p a, li a { color: var(--accent); }
 </style>
@@ -65,7 +69,14 @@
   <h1>OPNsense for Raspberry Pi</h1>
   <p class="sub">Flash-and-boot OPNsense 26.7 (FreeBSD 15.1) images. The UEFI firmware is already on the disk.</p>
   <p class="note">Unofficial community build, not supported by Deciso.</p>
-  <p class="sub"><strong>OPNsense vs VyOS on the Pi 5:</strong> <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">side-by-side speed and boot-time results</a> &middot; <a href="https://itpick.github.io/vyos-pi/">VyOS for Raspberry Pi</a></p>
+  <aside class="related" aria-label="Related projects">
+    <strong>Related projects</strong>
+    <ul>
+      <li><a href="https://itpick.github.io/vyos-pi/">vyos-pi</a>: VyOS images for Raspberry Pi 4/5</li>
+      <li><a href="https://itpick.github.io/sensr/">sensr</a>: Rust + NixOS firewall OS, an OPNsense remake (in development)</li>
+      <li><a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">OPNsense vs VyOS on the Pi 5</a>: side-by-side speed and boot-time results (<a href="#startup">startup table</a>)</li>
+    </ul>
+  </aside>
 
   <div class="boards">
     <div class="card">
@@ -78,7 +89,7 @@
         <li>No AES hardware, so VPNs are CPU-bound</li>
       </ul>
       <a class="btn" href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi4.img.xz">Download for Pi 4</a>
-      <div class="small"><a href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi4.img.xz.sha256">sha256</a></div>
+      <div class="small"><span data-asset="opnsense-pi/opnsense-pi4.img.xz">1.32 GB</span> &middot; <a href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi4.img.xz.sha256">sha256</a></div>
     </div>
     <div class="card">
       <span class="tag ok">Works</span>
@@ -91,11 +102,9 @@
         <li>AES hardware on Cortex-A76</li>
       </ul>
       <a class="btn secondary" href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi5.img.xz">Download for Pi 5</a>
-      <div class="small"><a href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi5.img.xz.sha256">sha256</a></div>
+      <div class="small"><span data-asset="opnsense-pi/opnsense-pi5.img.xz">1.32 GB</span> &middot; <a href="https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense-pi5.img.xz.sha256">sha256</a></div>
     </div>
   </div>
-
-  <p class="note" style="background:var(--code);color:var(--fg)">Prefer Linux? <a href="https://itpick.github.io/sensr/">sensr</a> is a Rust firewall OS on NixOS, built from what we learned here: it uses mainline Pi 5 Ethernet and RTL8157 support, and NixOS rollback. It is in planning; there are no images yet.</p>
 
   <h3 id="startup">Startup: time until traffic flows and until you can manage it</h3>
   <div class="tbl"><table class="startup">
@@ -123,6 +132,27 @@
   </table></div>
   <p class="fine">These end on the router itself, so they measure the NIC, driver and CPU, not routing or NAT; the router was carrying household traffic at the time. 940&nbsp;Mbit/s is the 1&nbsp;GbE limit. Method and raw data, side by side with VyOS on the same board type: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Pi 5 comparison</a>.</p>
 
+
+  <h3 id="image-size">Image size</h3>
+  <div class="tbl"><table>
+    <tr><th></th><th>Pi 5 download (.img.xz)</th><th>Pi 4 download</th><th>Installed on disk<span class="fine">*</span></th></tr>
+    <tr><td>opnsense-pi <span class="fine">(release <span data-release="opnsense-pi">26.7-4</span>)</span></td><td class="n"><span data-asset="opnsense-pi/opnsense-pi5.img.xz">1.32 GB</span></td><td class="n"><span data-asset="opnsense-pi/opnsense-pi4.img.xz">1.32 GB</span></td><td class="n">~2.1 GiB <span class="fine">(2,104 MiB)</span></td></tr>
+    <tr><td>vyos-pi <span class="fine">(release <span data-release="vyos-pi">2026.11.16-2</span>)</span></td><td class="n"><span data-asset="vyos-pi/vyos-pi-pi5.img.xz">599 MB</span></td><td class="n"><span data-asset="vyos-pi/vyos-pi-pi4.img.xz">562 MB</span></td><td class="n">~0.7 GiB <span class="fine">(732 MiB squashfs)</span></td></tr>
+    <tr><td>sensr <span class="fine">(estimate; not built yet)</span></td><td class="n">~200&ndash;300 MB <span class="fine">(estimate)</span></td><td class="n">&mdash;</td><td class="n">~400&ndash;500 MiB <span class="fine">(estimate)</span></td></tr>
+  </table></div>
+  <p class="fine">Downloads: the latest GitHub releases (this page updates the sizes from GitHub when it loads). *Installed: measured on x86 VMs in the <a href="https://github.com/itpick/sensr/blob/main/docs/research/07-performance-evaluation.md#22-b-os-base-footprint-and-boot">sensr benchmark</a> (OPNsense 26.7, VyOS rolling), not on the Pi images. The sensr row is an estimate for a trimmed NixOS closure plus the Pi firmware; the benchmark's untrimmed NixOS image was 487&nbsp;MB compressed with a 915&nbsp;MiB closure, which includes Python, Perl and Kea that sensr will not need.</p>
+
+  <h3 id="throughput">Throughput ceiling on the Pi 5</h3>
+  <p class="fine">Theoretical; not yet measured with 5&nbsp;GbE dongles.</p>
+  <div class="tbl"><table>
+    <tr><th>Link</th><th>Ceiling</th></tr>
+    <tr><td>Onboard Ethernet</td><td>1&nbsp;Gbit/s</td></tr>
+    <tr><td>Each blue USB 3.0 port</td><td>5&nbsp;Gbit/s signalling (USB 3.x Gen 1, 8b/10b coding), so at most 4&nbsp;Gbit/s of data. A 5&nbsp;GbE RTL8157 dongle can link at 5&nbsp;Gbit/s, but on a PC's Gen 1 port it moved <a href="https://lkml.iu.edu/hypermail/linux/kernel/2604.0/06464.html">3.47&nbsp;Gbit/s</a> in iperf3 (4.70 on Gen 2). Expect about 3.5&nbsp;Gbit/s per port. Each port has its own USB controller in the RP1 chip.</td></tr>
+    <tr><td>RP1 &harr; SoC</td><td><a href="https://www.raspberrypi.com/news/rp1-the-silicon-controlling-raspberry-pi-5-i-o-designed-here-at-raspberry-pi/">PCIe 2.0 x4</a>, about 16&nbsp;Gbit/s each way, shared by both USB ports and the onboard Ethernet. It is not the limit with two dongles.</td></tr>
+    <tr><td>Driver</td><td>FreeBSD's <code>ure</code> driver stops at the RTL8156: it has no RTL8157 support, in FreeBSD 15.1 (OPNsense 26.7) or in FreeBSD's main branch as of November 2026. 2.5&nbsp;GbE (RTL8156) is the fastest supported USB NIC, about 2.35&nbsp;Gbit/s per port.</td></tr>
+    <tr><td>Through the router</td><td>The lowest of the WAN port, the LAN port and what the CPU can forward. The firewall rules, NAT and Suricata set the real figure. <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Measured so far</a>.</td></tr>
+  </table></div>
+
   <h3>One-liner (Linux)</h3>
   <p>Writes the Pi 4 image straight to a disk. Replace <code>/dev/sdX</code>; everything on it is erased.</p>
   <div class="cmd">
@@ -147,7 +177,7 @@
 
   <footer>
     Source, VM tests and build scripts: <a href="https://github.com/itpick/opnsense-pi">github.com/itpick/opnsense-pi</a>.
-    The sibling project for VyOS: <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a>.
+    Related: <a href="https://itpick.github.io/vyos-pi/">vyos-pi</a> (VyOS images for Raspberry Pi 4/5) and <a href="https://itpick.github.io/sensr/">sensr</a> (Rust + NixOS firewall OS, in development).
     Built from <a href="https://github.com/maurice-w/opnsense-vm-images">maurice-w/opnsense-vm-images</a>,
     <a href="https://github.com/pftf/RPi4">pftf/RPi4</a> and
     <a href="https://github.com/NumberOneGit/rpi5-uefi">NumberOneGit/rpi5-uefi</a>.
@@ -164,6 +194,23 @@
       });
     });
   });
+</script>
+<script>
+  (function () {
+    function fmt(b) { return b >= 1e9 ? (b / 1e9).toFixed(2) + " GB" : Math.round(b / 1e6) + " MB"; }
+    ["opnsense-pi", "vyos-pi"].forEach(function (repo) {
+      fetch("https://api.github.com/repos/itpick/" + repo + "/releases/latest")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rel) {
+          if (!rel) return;
+          document.querySelectorAll('[data-release="' + repo + '"]').forEach(function (e) { e.textContent = rel.tag_name; });
+          (rel.assets || []).forEach(function (a) {
+            document.querySelectorAll('[data-asset="' + repo + "/" + a.name + '"]').forEach(function (e) { e.textContent = fmt(a.size); });
+          });
+        })
+        .catch(function () {});
+    });
+  })();
 </script>
 </body>
 </html>
