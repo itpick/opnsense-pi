@@ -1,0 +1,138 @@
+--- a/rp1_eth.c	2026-11-15 20:43:08.773635119 -0600
++++ b/rp1_eth.c	2026-11-15 20:43:08.776332114 -0600
+@@ -88,16 +88,18 @@
+ 
+ /* NOTE: CGEM64 is deliberately NOT defined; 32-bit descriptors only. */
+ 
+-#define RP1ETH_NUM_RX_DESCS	256
+-#define RP1ETH_NUM_TX_DESCS	256
+-#define RP1ETH_DEFAULT_RXBUFS	128
++#define RP1ETH_NUM_RX_DESCS	512
++#define RP1ETH_NUM_TX_DESCS	512
++#define RP1ETH_DEFAULT_RXBUFS	(RP1ETH_NUM_RX_DESCS - 1)
+ #define TX_MAX_DMA_SEGS		8
+ 
+ /*
+- * Poll interval: 200 Hz → 5 ms.  Effective throughput is limited until
+- * Milestone 3 adds real interrupts.
++ * Poll interval: 1 ms (was 5 ms), with a 512-slot ring and 511 RX buffers
++ * (was 256 and 128).  At 5 ms with 128 buffers the ring ran dry at about
++ * 200 Mbit/s and the MAC dropped the rest (_rxnobufs climbs).
+  */
+-#define RP1ETH_POLL_HZ		200
++#define RP1ETH_POLL_HZ		1000
++#define RP1ETH_POLL_TICKS	MAX(1, hz / RP1ETH_POLL_HZ)
+ 
+ MALLOC_DECLARE(M_RP1ETH);	/* declared in rp1_eth_cfg.c */
+ 
+@@ -478,7 +480,7 @@
+ 
+ 	CGEM_ASSERT_LOCKED(sc);
+ 
+-	while (sc->rxring_queued < sc->rxbufs) {
++	while (sc->rxring_queued < MIN(sc->rxbufs, RP1ETH_NUM_RX_DESCS - 1)) {
+ 		m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
+ 		if (m == NULL)
+ 			break;
+@@ -955,7 +957,7 @@
+ 	cgem_poll_hw_stats(sc);
+ 
+ 	/*
+-	 * RX safety net.  The 5 ms poll chain is the only reliable RX
++	 * RX safety net.  The 1 ms poll chain is the only reliable RX
+ 	 * trigger, and if it is ever lost (or the ring gets out of step
+ 	 * with the hardware) receive stops for good while TX keeps
+ 	 * working.  Kick the interrupt task every tick, which drains the
+@@ -987,7 +989,7 @@
+ }
+ 
+ /* -----------------------------------------------------------------------
+- * gem_poll — 5 ms fallback poll.  Fires when IACK cannot re-fire MSI
++ * gem_poll — 1 ms fallback poll.  Fires when IACK cannot re-fire MSI
+  * (shared SPI-229 stays asserted by USB activity).
+  * Uses callout_init(CALLOUT_MPSAFE) — acquires sc_mtx itself.
+  * Safe to stop from interrupt context (cgem_intr_filter) without the lock.
+@@ -1009,14 +1011,23 @@
+ 	    (CGEM_INTR_RX_COMPLETE | CGEM_INTR_TX_USED_READ |
+ 	     CGEM_INTR_HRESP_NOT_OK | CGEM_INTR_RX_USED_READ |
+ 	     CGEM_INTR_RX_OVERRUN);
+-	if (ist != 0) {
++	/*
++	 * Don't go by INTR_STAT alone.  Under load, frames sit in the ring
++	 * with RX_COMPLETE never latched (seen: the poll running ~900 times
++	 * a second while all 511 buffers filled and the MAC dropped), so
++	 * check the ring itself, and keep TX completions moving.
++	 */
++	if (sc->rxring_queued > 0 &&
++	    (sc->rxring[sc->rxring_tl_ptr].addr & CGEM_RXDESC_OWN) != 0)
++		ist |= CGEM_INTR_RX_COMPLETE;
++	if (ist != 0 || sc->txring_queued > 0) {
+ 		WR4(sc, CGEM_INTR_DIS, CGEM_INTR_ALL);
+ 		atomic_set_32(&sc->intr_pending, ist);
+ 		taskqueue_enqueue(taskqueue_fast, &sc->intr_task);
+ 		/* task will re-arm gem_poll when done */
+ 	} else {
+-		/* Nothing yet: re-arm for the next 5 ms window. */
+-		callout_reset(&sc->gem_poll, MAX(1, hz / 200), cgem_gem_poll, sc);
++		/* Nothing yet: re-arm for the next 1 ms window. */
++		callout_reset(&sc->gem_poll, RP1ETH_POLL_TICKS, cgem_gem_poll, sc);
+ 	}
+ 
+ 	CGEM_UNLOCK(sc);
+@@ -1064,8 +1075,23 @@
+ 
+ 	WR4(sc, CGEM_INTR_STAT, ist);		/* write-to-clear latched bits */
+ 
+-	if ((ist & CGEM_INTR_RX_COMPLETE) != 0)
+-		cgem_recv(sc);
++	if ((ist & CGEM_INTR_RX_COMPLETE) != 0) {
++		int pass;
++
++		/*
++		 * cgem_recv drops the lock while the batch goes up the stack,
++		 * and more frames land meanwhile; take them now rather than
++		 * a poll interval later.
++		 */
++		for (pass = 0; pass < 8; pass++) {
++			cgem_recv(sc);
++			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0 ||
++			    sc->rxring_queued == 0 ||
++			    (sc->rxring[sc->rxring_tl_ptr].addr &
++			    CGEM_RXDESC_OWN) == 0)
++				break;
++		}
++	}
+ 	cgem_clean_tx(sc);
+ 
+ 	if ((ist & CGEM_INTR_HRESP_NOT_OK) != 0) {
+@@ -1092,13 +1118,13 @@
+ 	    CGEM_INTR_RX_OVERRUN);
+ 
+ 	/*
+-	 * Re-arm the 5ms fallback poll.  IACK cannot generate per-packet MSIs
++	 * Re-arm the 1 ms fallback poll.  IACK cannot generate per-packet MSIs
+ 	 * on this platform (shared SPI-229 kept permanently asserted by USB),
+ 	 * so gem_poll is the sole mechanism for catching packets that arrive
+ 	 * while interrupts were masked.  Arm unconditionally; cgem_intr_filter
+ 	 * cancels it if a real interrupt fires first.
+ 	 */
+-	callout_reset(&sc->gem_poll, MAX(1, hz / 200), cgem_gem_poll, sc);
++	callout_reset(&sc->gem_poll, RP1ETH_POLL_TICKS, cgem_gem_poll, sc);
+ 
+ 	CGEM_UNLOCK(sc);
+ }
+@@ -1229,12 +1255,12 @@
+ 	sc->rx_sw_last = sc->rx_sw_frames;
+ 	callout_reset(&sc->tick_ch, hz, rp1eth_tick, sc);
+ 	/*
+-	 * Start the 5 ms RX poll now.  Otherwise only cgem_intr_task arms it,
++	 * Start the 1 ms RX poll now.  Otherwise only cgem_intr_task arms it,
+ 	 * and that runs only after an interrupt: without the bcm2712_pcie shim
+ 	 * (no DSDT override) none ever arrives and received frames are never
+ 	 * processed.  A real interrupt cancels the poll in cgem_intr_filter.
+ 	 */
+-	callout_reset(&sc->gem_poll, MAX(1, hz / 200), cgem_gem_poll, sc);
++	callout_reset(&sc->gem_poll, RP1ETH_POLL_TICKS, cgem_gem_poll, sc);
+ }
+ 
+ static void

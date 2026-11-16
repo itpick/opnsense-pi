@@ -14,7 +14,7 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | | Raspberry Pi 4 | Raspberry Pi 5 |
 |---|---|---|
 | UEFI firmware | [pftf/RPi4](https://github.com/pftf/RPi4) v1.53 | [NumberOneGit/rpi5-uefi](https://github.com/NumberOneGit/rpi5-uefi) v0.1 (D0 boards; SD boot only) |
-| Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [fixes](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 5 ms (~4 ms LAN latency) |
+| Onboard Ethernet | `genet0` works (use as LAN) | `rp1eth0` works: RP1 driver `rp1_eth` from [aphor/FreeBSD15-RPi5-modules](https://github.com/aphor/FreeBSD15-RPi5-modules) (plus [fixes](patches/rpi5-kmods/)), loaded at boot on a Pi 5. 1 Gb/s link; received frames are polled every 1 ms (about 830 Mbit/s down, 700 up through the router; see [Pi 5 throughput](#pi-5-throughput)) |
 | WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: RTL8156 2.5 GbE adapters (`0bda:8156`) attach as `ue0`, `ue1`, ... (`ure`) and carry traffic; with more than one, pin their names (`ifnames`, below) |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
@@ -25,6 +25,37 @@ USB NICs in daily use on the Pi 5: two [WAVLINK USB C to Ethernet Adapter 2.5 Gb
 2.5 Gb/s. Any RTL8156/RTL8156B adapter should behave the same. 5 GbE USB adapters (such as
 WAVLINK's [5 Gbps version](https://a.co/d/007RQrjE)) usually use the RTL8157, which FreeBSD
 15.1's `ure` driver does not support, so they are not expected to work.
+
+### Pi 5 throughput
+
+Measured on 2026-11-16 on the home router above: Pi 5 16 GB (D0), OPNsense 26.7.9_1, WAN on
+`rp1eth0` to an AT&T fiber gateway (1 Gb/s plan), LAN on an RTL8156 adapter (`ue1`) linked at
+1 Gb/s. Suricata (IDS mode, `ac` pattern matcher), NetFlow, Unbound and WireGuard were running.
+The client was a Mac on a wired 1 Gb/s USB adapter; the test was the Ookla `speedtest` CLI 1.2.0
+against AT&T's Dallas server (ID 69099), two runs.
+
+| `rp1_eth` driver | Download | Upload | Latency | Packet loss |
+|---|---|---|---|---|
+| 26.7-3: 5 ms poll, 128 RX buffers | 208 Mbit/s \* | 621 Mbit/s \* | | |
+| [Throughput fix](patches/rpi5-kmods/rp1_eth-throughput.patch): 1 ms poll, 511 RX buffers, ring checked directly | 836 / 817 Mbit/s | 696 / 717 Mbit/s | 4 ms | 0.0% |
+
+\* Measured with macOS `networkQuality` (Apple's servers), not Ookla.
+
+Pi 5 CPU during one full speedtest run (download and upload; busy %, sampled every second from
+`kern.cp_times`):
+
+| Core | Average | Peak |
+|---|---|---|
+| cpu0 | 16% | 42% |
+| cpu1 | 23% | 61% |
+| cpu2 | 21% | 53% |
+| cpu3 | 12% | 45% |
+| All cores | 18% | |
+
+The CPU is not the limit. The old driver lost received frames: under load the RX ring filled
+between polls and the MAC dropped them (`_rxnobufs` climbed by thousands per test). With the
+fix it stays near zero. A gigabit link tops out near 940 Mbit/s of TCP payload; the last
+~100 Mbit/s has not been tracked down yet.
 
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
