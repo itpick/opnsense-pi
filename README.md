@@ -18,7 +18,7 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: RTL8156 2.5 GbE adapters (`0bda:8156`) attach as `ue0`, `ue1`, ... (`ure`) and carry traffic; with more than one, pin their names (`ifnames`, below) |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
-| Verdict | Works today | Experimental, but in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
+| Verdict | Works today | Works: in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
 
 USB NICs in daily use on the Pi 5: two [WAVLINK USB C to Ethernet Adapter 2.5 Gbps](https://a.co/d/0d9jG2Pi)
 (RTL8156, `0bda:8156`) on the USB 3 ports, linked at 1 and
