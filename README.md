@@ -18,7 +18,7 @@ plus QEMU tests that boot them on a Pi-shaped VM.
 | WAN | USB 3 NIC, RTL8153 (`ure0`) or AX88179 (`axge0`) | USB 3 NIC: RTL8156 2.5 GbE adapters (`0bda:8156`) attach as `ue0`, `ue1`, ... (`ure`) and carry traffic; with more than one, pin their names (`ifnames`, below) |
 | AES in hardware | No (BCM2711 has no ARMv8 crypto), so VPNs are CPU-bound | Yes (Cortex-A76) |
 | Other drivers | `os-realtek-re` preinstalled (`if_re.ko`) | `os-realtek-re` preinstalled; `rpi5` fan control |
-| Verdict | Works today | Experimental, but in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
+| Verdict | Works today | Works: in daily use as a home router on one Pi 5 16 GB (D0) since 26.7-3: WAN on `rp1eth0` (DHCP from an ISP gateway, IPv4 and IPv6), LAN and Wi-Fi LAN on two RTL8156 USB adapters, ISC DHCP, Unbound, WireGuard, Suricata (IDS) and NetFlow |
 
 USB NICs in daily use on the Pi 5: two [WAVLINK USB C to Ethernet Adapter 2.5 Gbps](https://a.co/d/0d9jG2Pi)
 (RTL8156, `0bda:8156`) on the USB 3 ports, linked at 1 and
@@ -54,8 +54,28 @@ Pi 5 CPU during one full speedtest run (download and upload; busy %, sampled eve
 
 The CPU is not the limit. The old driver lost received frames: under load the RX ring filled
 between polls and the MAC dropped them (`_rxnobufs` climbed by thousands per test). With the
-fix it stays near zero. A gigabit link tops out near 940 Mbit/s of TCP payload; the last
-~100 Mbit/s has not been tracked down yet.
+fix it stays near zero.
+
+The LAN adapter alone (`iperf3` 3.22 between the router and the Mac over `ue1`, linked at
+1 Gb/s; 1 and 4 streams):
+
+| Direction | Throughput | Pi 5 CPU |
+|---|---|---|
+| Router sends (`ue1` transmits) | 929 / 928 Mbit/s | |
+| Router receives (`ue1` receives) | 574 / 599 Mbit/s | 15% average, busiest core 41% peak; `usb` thread ~28% of a core |
+
+So each direction has one slower side. A gigabit link carries about 940 Mbit/s of TCP payload
+at most:
+
+- **Download** (~830 Mbit/s): limited by `rp1eth0` receive. `ue1` can send at line rate.
+- **Upload** (~700 Mbit/s): limited by the USB adapter's receive path in FreeBSD's `ure` driver,
+  not the CPU.
+
+For the same reason, moving the WAN to a USB adapter would make downloads slower, not faster.
+
+Not yet tested: anything above 1 Gb/s. `ue0` links at 2.5 Gb/s to a Wi-Fi access point, but
+no wired 2.5 Gb/s client has been tried. Over Wi-Fi it measured 239 / 333 Mbit/s, which is the
+Wi-Fi, not the adapter.
 
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
