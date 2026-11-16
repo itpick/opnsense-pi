@@ -54,8 +54,28 @@ Pi 5 CPU during one full speedtest run (download and upload; busy %, sampled eve
 
 The CPU is not the limit. The old driver lost received frames: under load the RX ring filled
 between polls and the MAC dropped them (`_rxnobufs` climbed by thousands per test). With the
-fix it stays near zero. A gigabit link tops out near 940 Mbit/s of TCP payload; the last
-~100 Mbit/s has not been tracked down yet.
+fix it stays near zero.
+
+The LAN adapter alone (`iperf3` 3.22 between the router and the Mac over `ue1`, linked at
+1 Gb/s; 1 and 4 streams):
+
+| Direction | Throughput | Pi 5 CPU |
+|---|---|---|
+| Router sends (`ue1` transmits) | 929 / 928 Mbit/s | |
+| Router receives (`ue1` receives) | 574 / 599 Mbit/s | 15% average, busiest core 41% peak; `usb` thread ~28% of a core |
+
+So each direction has one slower side. A gigabit link carries about 940 Mbit/s of TCP payload
+at most:
+
+- **Download** (~830 Mbit/s): limited by `rp1eth0` receive. `ue1` can send at line rate.
+- **Upload** (~700 Mbit/s): limited by the USB adapter's receive path in FreeBSD's `ure` driver,
+  not the CPU.
+
+For the same reason, moving the WAN to a USB adapter would make downloads slower, not faster.
+
+Not yet tested: anything above 1 Gb/s. `ue0` links at 2.5 Gb/s to a Wi-Fi access point, but
+no wired 2.5 Gb/s client has been tried. Over Wi-Fi it measured 239 / 333 Mbit/s, which is the
+Wi-Fi, not the adapter.
 
 OPNsense 26.7 is FreeBSD 15.1-RELEASE (`__FreeBSD_version` 1501000).
 
