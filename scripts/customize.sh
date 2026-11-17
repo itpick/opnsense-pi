@@ -79,6 +79,13 @@ plugin_versions=$(chroot "$root" pkg query '  %n %v' | grep -E "$(echo "$PLUGINS
 rm -f "$root/etc/resolv.conf"
 [ -n "$had_resolv" ] && mv "$root/etc/resolv.conf.opnsense-pi" "$root/etc/resolv.conf"
 umount "$root/dev"
+# Boot hook and the rest of the overlay (before the loader.conf step below:
+# the overlay's own rc.loader.d chunk, 30-opnsense-pi, goes in there too).
+(cd overlay && find . -type f) | while read -r f; do
+	mkdir -p "$(dirname "$root/$f")"
+	install -m "$(stat -f %Lp "overlay/$f")" "overlay/$f" "$root/$f"
+done
+
 # OPNsense assembles /boot/loader.conf from rc.loader.d on its own later; until
 # then, append the new chunks to the image's loader.conf (running rc.loader here
 # would drop lines the image build wrote directly, such as console="efi").
@@ -103,12 +110,6 @@ EOF
 else
 	echo "BOARD=$board" > "$root/usr/local/etc/opnsense-pi/board.conf"
 fi
-
-# Boot hook and the rest of the overlay.
-(cd overlay && find . -type f) | while read -r f; do
-	mkdir -p "$(dirname "$root/$f")"
-	install -m "$(stat -f %Lp "overlay/$f")" "overlay/$f" "$root/$f"
-done
 
 manifest=$root/usr/local/etc/opnsense-pi/manifest.txt
 {

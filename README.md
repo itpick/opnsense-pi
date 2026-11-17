@@ -150,11 +150,13 @@ Suricata would not start.
 ### First boot
 
 1. Update the Pi's EEPROM bootloader first (from Raspberry Pi OS: `sudo rpi-eeprom-update -a`).
-2. Pi 4: press Esc at the UEFI splash. Go to **Device Manager → Raspberry Pi Configuration → Advanced Configuration**,
+2. Pi 4: press Esc at the UEFI splash (it waits 1 s: press Esc repeatedly while it powers on). Go to **Device Manager → Raspberry Pi Configuration → Advanced Configuration**,
    set **Limit RAM to 3 GB** to *Disabled*, then save and reset.
 3. On the console (HDMI), assign interfaces: LAN `genet0` (Pi 4) or `rp1eth0` (Pi 5), WAN `ue0`.
    Or skip the console: seed a `config.xml` on the FAT partition (see above).
 4. Browse to https://192.168.1.1 and log in as `root` / `opnsense`. Change the password.
+
+Boot time, what the image does to shorten it and the EEPROM settings that help: [docs/boot-time.md](docs/boot-time.md).
 
 ## Build it
 
@@ -163,7 +165,7 @@ make image BOARD=pi4      # -> out/opnsense-pi4.img.xz (+ .sha256), without the 
 make images               # both boards
 ```
 
-Needs `curl qemu-img sfdisk unzip mtools xz python3`. With Nix: `nix develop`.
+Needs `curl qemu-img sfdisk unzip mtools xz python3` and `virt-fw-vars` (`pip install virt-firmware`). With Nix: `nix develop`.
 Inputs are pinned by URL and sha256 in [`versions.env`](versions.env).
 
 A release image takes three steps, which [CI](.github/workflows/release.yml) runs on every
@@ -193,6 +195,8 @@ make test-image  BOARD=pi4 # boot the built image; for a customized one also see
                            # NIC names pinned by MAC, Suricata hs switched to ac
 make test-trial  BOARD=pi5 # reboot-after-minutes reboots the image by itself
 make test                  # everything, both boards
+vm/boot-bench.sh seed pi5  # boot timing (docs/boot-time.md): seed a VM, then
+vm/boot-bench.sh run base  # time cold boots and reboots from the serial console
 ```
 
 | | Pi 5 profile | Pi 4 profile |

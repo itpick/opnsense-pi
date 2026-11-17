@@ -1,0 +1,5 @@
+# opnsense-pi: the boot menu counts down 1 s, not OPNsense's 3 (20-misc),
+# before it boots; a key in that second stops it there as before. An
+# autoboot_delay under System: Settings: Tunables comes later in
+# /boot/loader.conf and wins.
+autoboot_delay="1"
