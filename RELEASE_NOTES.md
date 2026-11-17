@@ -13,4 +13,6 @@ curl -fL https://github.com/itpick/opnsense-pi/releases/latest/download/opnsense
 
 Each image's contents: `opnsense-<board>.manifest.txt`. Its default config, to seed from (`opnsense-pi/config.xml` on the FAT partition): `opnsense-<board>.config.xml`.
 
+Boot time, what the image does to shorten it (UEFI splash 1 s, boot menu 1 s), and EEPROM settings that help: [docs/boot-time.md](https://github.com/itpick/opnsense-pi/blob/main/docs/boot-time.md).
+
 First-boot steps and VM tests: see the [README](https://github.com/itpick/opnsense-pi#readme).
