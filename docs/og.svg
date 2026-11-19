@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0f1115"/>
+  <g stroke="#24272e" stroke-width="1">
+    <path d="M0 120H1200M0 240H1200M0 360H1200M0 480H1200"/>
+    <path d="M160 0V630M400 0V630M640 0V630M880 0V630M1120 0V630"/>
+  </g>
+  <rect x="0" y="0" width="1200" height="8" fill="#f97316"/>
+  <text x="80" y="250" font-family="Helvetica, Arial, sans-serif" font-size="104" font-weight="bold" fill="#f5f7fa">OPNsense for</text>
+  <text x="80" y="370" font-family="Helvetica, Arial, sans-serif" font-size="104" font-weight="bold" fill="#f97316">Raspberry Pi</text>
+  <text x="84" y="460" font-family="Helvetica, Arial, sans-serif" font-size="38" fill="#c7cdd6">Flash-and-boot OPNsense 26.7 images for Pi 4 and Pi 5</text>
+  <text x="84" y="530" font-family="Helvetica, Arial, sans-serif" font-size="30" fill="#8f98a5">The UEFI firmware is already on the disk</text>
+  <text x="84" y="590" font-family="Helvetica, Arial, sans-serif" font-size="28" fill="#f97316">itpick.github.io/opnsense-pi</text>
+</svg>
