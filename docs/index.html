@@ -6,6 +6,23 @@
 <title>OPNsense for Raspberry Pi</title>
 <meta name="description" content="Unofficial flashable OPNsense images for the Raspberry Pi 4 and 5.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://itpick.github.io/opnsense-pi/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OPNsense for Raspberry Pi">
+<meta property="og:title" content="OPNsense for Raspberry Pi">
+<meta property="og:description" content="Unofficial flash-and-boot OPNsense 26.7 images for the Raspberry Pi 4 and 5, UEFI firmware included.">
+<meta property="og:url" content="https://itpick.github.io/opnsense-pi/">
+<meta property="og:image" content="https://itpick.github.io/opnsense-pi/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="OPNsense for Raspberry Pi: flash-and-boot OPNsense images for Pi 4 and Pi 5">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OPNsense for Raspberry Pi">
+<meta name="twitter:description" content="Unofficial flash-and-boot OPNsense 26.7 images for the Raspberry Pi 4 and 5, UEFI firmware included.">
+<meta name="twitter:image" content="https://itpick.github.io/opnsense-pi/og.png">
+<meta name="twitter:image:alt" content="OPNsense for Raspberry Pi: flash-and-boot OPNsense images for Pi 4 and Pi 5">
+
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
@@ -110,13 +127,13 @@
 
   <h3 id="startup">Startup on a real Pi 5: time until traffic flows</h3>
   <div class="tbl"><table class="startup">
-    <tr><th>Real Pi 5 (16&nbsp;GB), from the reboot command</th><th>opnsense-pi</th><th>vyos-pi</th><th><a href="https://github.com/itpick/sensr/blob/main/docs/research/07-performance-evaluation.md">sensr</a> <span class="fine">(in development)</span></th></tr>
-    <tr><td>Kernel starts</td><td class="n">36&ndash;38 s</td><td class="n">14 s</td><td class="n">not yet on real hardware</td></tr>
-    <tr><td><strong>Traffic flowing</strong> <span class="fine">(network up)</span></td><td class="n"><strong>64&ndash;67 s</strong></td><td class="n"><strong>48 s</strong></td><td class="n">not yet on real hardware<br><span class="fine">on-device trial planned</span></td></tr>
-    <tr><td>SSH / UI ready</td><td class="n">65&ndash;68 s<br><span class="fine">web GUI</span></td><td class="n">47&ndash;48 s<br><span class="fine">SSH</span></td><td class="n">&mdash;</td></tr>
-    <tr><td>Fully ready</td><td class="n">81&ndash;85 s</td><td class="n">48&ndash;49 s</td><td class="n">&mdash;</td></tr>
+    <tr><th>Real Pi 5 (16&nbsp;GB), from the reboot command</th><th>opnsense-pi</th><th>vyos-pi</th><th><a href="https://github.com/itpick/sensr/blob/main/docs/research/07-performance-evaluation.md">sensr</a> <span class="fine">(development build, ran on a Pi 5)</span></th></tr>
+    <tr><td>Kernel starts</td><td class="n">36&ndash;38 s</td><td class="n">14 s</td><td class="n">&asymp;19 s <span class="fine">(derived)</span></td></tr>
+    <tr><td><strong>Traffic flowing</strong> <span class="fine">(network up)</span></td><td class="n"><strong>64&ndash;67 s</strong></td><td class="n"><strong>48 s</strong></td><td class="n"><strong>&asymp;34 s</strong></td></tr>
+    <tr><td>SSH / UI ready</td><td class="n">65&ndash;68 s<br><span class="fine">web GUI</span></td><td class="n">47&ndash;48 s<br><span class="fine">SSH</span></td><td class="n">43 s<br><span class="fine">SSH; UI assets not packaged yet</span></td></tr>
+    <tr><td>Fully ready</td><td class="n">81&ndash;85 s</td><td class="n">48&ndash;49 s</td><td class="n">&asymp;66 s</td></tr>
   </table></div>
-  <p class="fine">Timed from the reboot command, so shutdown, the Pi firmware and the boot loader come first (the "kernel starts" row): OPNsense boots through UEFI, VyOS straight from the Pi firmware. "Traffic flowing" is the LAN port up with an address; "fully ready" is OPNsense's last boot script or VyOS's config loaded. OPNsense from its own boot logs over 7 typical reboots (1&nbsp;s resolution); VyOS from 2 warm reboots, its journal plus a 1&nbsp;s external watcher. VyOS has no web UI, so its figure is SSH. Method and every run: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md#boot-time">Pi 5 comparison, boot time</a>.</p>
+  <p class="fine">Timed from the reboot command, so shutdown, the Pi firmware and the boot loader come first (the "kernel starts" row): OPNsense boots through UEFI, VyOS straight from the Pi firmware. "Traffic flowing" is the LAN port up with an address; "fully ready" is OPNsense's last boot script or VyOS's config loaded. OPNsense from its own boot logs over 7 typical reboots (1&nbsp;s resolution); VyOS from 2 warm reboots, its journal plus a 1&nbsp;s external watcher. VyOS has no web UI, so its figure is SSH. The sensr column is its development trial (pi5-1, imported home-router config): on the box, kernel 0.6&nbsp;s, initrd 4.7&nbsp;s and userspace 41.9&nbsp;s, LAN carrier 14.9&nbsp;s, SSH 24.0&nbsp;s after kernel start, and 43&nbsp;s from the reboot command to SSH by wall clock; the kernel/traffic/ready rows are that 43&nbsp;s less the kernel-to-SSH interval (&asymp;1&nbsp;s uncertainty). Method and every run: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md#boot-time">Pi 5 comparison, boot time</a>.</p>
   <details class="x86">
     <summary>x86 VM (relative only, not the Pi)</summary>
     <div class="tbl"><table class="startup">
@@ -140,6 +157,7 @@
     <tr><td>UDP out at 1&nbsp;Gb/s</td><td class="n">930, 0.04% loss</td><td class="n">40%</td></tr>
   </table></div>
   <p class="fine">These end on the router itself, so they measure the NIC, driver and CPU, not routing or NAT; the router was carrying household traffic at the time. 940&nbsp;Mbit/s is the 1&nbsp;GbE limit. Method and raw data, side by side with VyOS on the same board type: <a href="https://github.com/itpick/vyos-pi/blob/main/docs/comparison/pi5-iperf-vyos-vs-opnsense.md">Pi 5 comparison</a>.</p>
+  <p class="fine">On the same kind of board, a sensr development trial (Pi 5, 16&nbsp;GB, USB RTL8156 LAN) measured 940&nbsp;Mbit/s into the router and 932&nbsp;Mbit/s out with 4 TCP streams &ndash; the Mac's 1&nbsp;GbE limit &ndash; and, forwarded through NAT and the firewall on a 1&nbsp;Gb/s AT&amp;T line, 436&nbsp;Mbit/s up and about 717&nbsp;Mbit/s down. Its boot figures are in the table above.</p>
 
 
   <h3 id="image-size">Image size</h3>
